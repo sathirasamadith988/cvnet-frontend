@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import Link from "next/link";
+import Image from "next/image";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   FileText,
@@ -11,24 +11,32 @@ import {
   Settings,
   Zap,
   ChevronRight,
-} from 'lucide-react';
+} from "lucide-react";
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/cv', label: 'My CV', icon: FileText },
-  { href: '/skill-gap', label: 'Skill Gap', icon: BarChart2 },
-  { href: '/applications', label: 'Applications', icon: Briefcase, badge: 3 },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/cv", label: "My CV", icon: FileText },
+  { href: "/skill-gap", label: "Skill Gap", icon: BarChart2 },
+  { href: "/applications", label: "Applications", icon: Briefcase, badge: 3 },
 ];
 
 export default function CandidateSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 flex flex-col z-30"
-      style={{ backgroundColor: '#0F172A' }}>
+    <aside
+      className="fixed left-0 top-0 h-screen w-64 flex flex-col z-30"
+      style={{ backgroundColor: "#0F172A" }}
+    >
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-5 border-b border-slate-700">
-        <Image src="/logo.jpeg" alt="CVNet Logo" width={36} height={36} className="rounded-lg object-cover" />
+        <Image
+          src="/logo.jpeg"
+          alt="CVNet Logo"
+          width={36}
+          height={36}
+          className="rounded-lg object-cover"
+        />
         <div>
           <p className="text-white font-bold text-base leading-tight">CVNet</p>
           <p className="text-slate-400 text-xs">HR Tech Platform</p>
@@ -46,8 +54,8 @@ export default function CandidateSidebar() {
                   href={href}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                     isActive
-                      ? 'bg-blue-600 text-white'
-                      : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                      ? "bg-blue-600 text-white"
+                      : "text-slate-300 hover:bg-slate-700 hover:text-white"
                   }`}
                 >
                   <Icon size={18} />
@@ -63,23 +71,7 @@ export default function CandidateSidebar() {
           })}
         </ul>
 
-        {/* Pro Plan Banner */}
-        <div className="mt-6 mx-1 rounded-xl p-4" style={{ background: 'linear-gradient(135deg, #1e3a5f, #1e40af)' }}>
-          <div className="flex items-center gap-2 mb-2">
-            <Zap size={14} className="text-yellow-400" />
-            <span className="text-yellow-400 text-xs font-bold">Pro Plan</span>
-          </div>
-          <p className="text-slate-200 text-xs leading-relaxed mb-3">
-            Upgrade for AI Analysis
-          </p>
-          <Link
-            href="#"
-            className="flex items-center justify-center gap-1 w-full bg-blue-500 hover:bg-blue-400 text-white text-xs font-semibold py-2 rounded-lg transition-colors"
-          >
-            Upgrade Now
-            <ChevronRight size={12} />
-          </Link>
-        </div>
+        {/* Pro plan banner removed */}
       </nav>
 
       {/* Settings + User */}
@@ -87,9 +79,9 @@ export default function CandidateSidebar() {
         <Link
           href="/settings"
           className={`flex items-center gap-3 px-6 py-3 text-sm font-medium transition-colors ${
-            pathname === '/settings'
-              ? 'text-blue-400'
-              : 'text-slate-400 hover:text-white'
+            pathname === "/settings"
+              ? "text-blue-400"
+              : "text-slate-400 hover:text-white"
           }`}
         >
           <Settings size={16} />
@@ -100,7 +92,9 @@ export default function CandidateSidebar() {
             AJ
           </div>
           <div className="min-w-0">
-            <p className="text-white text-sm font-semibold truncate">Alex Johnson</p>
+            <p className="text-white text-sm font-semibold truncate">
+              Alex Johnson
+            </p>
             <p className="text-slate-400 text-xs truncate">Candidate Account</p>
           </div>
         </div>
