@@ -152,14 +152,20 @@ export default function CandidatesPage() {
               />
             </div>
             <div className="relative">
-              <select className="appearance-none pl-3 pr-8 py-2 text-sm border border-slate-200 rounded-xl bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
+              <select 
+                aria-label="Sort candidates"
+                className="appearance-none pl-3 pr-8 py-2 text-sm border border-slate-200 rounded-xl bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              >
                 <option>Match Score</option>
                 <option>Experience</option>
                 <option>Name A-Z</option>
               </select>
               <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
-            <button className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors lg:hidden">
+            <button 
+              aria-label="Filter candidates"
+              className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors lg:hidden"
+            >
               <SlidersHorizontal size={16} className="text-slate-600" />
             </button>
           </div>
@@ -196,7 +202,10 @@ export default function CandidatesPage() {
                     <div>
                       <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusConfig[status]}`}>{status}</span>
                     </div>
-                    <Link href="#" className="text-xs font-semibold text-blue-600 hover:text-blue-700 border border-blue-200 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors">
+                    <Link
+                      href={`/recruiter/candidates/${email}`}
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-700 border border-blue-200 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors"
+                    >
                       View Profile
                     </Link>
                   </div>
