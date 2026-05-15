@@ -57,26 +57,6 @@ export default function SignupPage() {
           <h1 className="text-2xl font-extrabold text-slate-900 mb-1">Create your account</h1>
           <p className="text-slate-500 text-sm mb-6">Start your free trial. No credit card required.</p>
 
-          {/* Role Toggle */}
-          <div className="flex rounded-xl border border-slate-200 overflow-hidden mb-6">
-            <button
-              onClick={() => setRole('candidate')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold transition-colors ${
-                role === 'candidate' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <User size={15} /> Candidate
-            </button>
-            <button
-              onClick={() => setRole('recruiter')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold transition-colors ${
-                role === 'recruiter' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <Briefcase size={15} /> Recruiter
-            </button>
-          </div>
-
           {/* Social Login */}
           <div className="flex flex-col gap-3 mb-5">
             <button className="flex items-center justify-center gap-3 border border-slate-200 hover:bg-slate-50 rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 transition-colors">
