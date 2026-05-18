@@ -5,9 +5,52 @@ import Image from "next/image";
 import { useState } from "react";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
 
+/* login setup */
+import { authService } from "@/services/authService";
+import { useRouter } from "next/navigation";
+
 export default function LoginPage() {
+  /* State Management */
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+
+  /**
+   * Handle Email/Password Login
+   * Uses authService to communicate with Firebase and Backend
+   */
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      await authService.login(email, password);
+      router.push("/dashboard"); // Successful login redirect
+    } catch (error: any) {
+      // Capture Firebase or Backend error messages
+      alert(error.response?.data?.error || error.message || "Login failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Handle Google Login
+   * Triggers Firebase Popup and syncs token with backend
+   */
+  const handleGoogleLogin = async () => {
+    setIsLoading(true);
+    try {
+      await authService.loginWithGoogle();
+      router.push("/dashboard");
+    } catch (error: any) {
+      alert("Google Login failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex">
@@ -35,7 +78,11 @@ export default function LoginPage() {
 
           {/* Social Login */}
           <div className="flex flex-col gap-3 mb-6">
-            <button className="flex items-center justify-center gap-3 border border-slate-200 hover:bg-slate-50 rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 transition-colors">
+            <button 
+              type="button"
+              disabled={isLoading}
+              onClick={handleGoogleLogin}
+              className="flex items-center justify-center gap-3 border border-slate-200 hover:bg-slate-50 rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 transition-colors disabled:opacity-50"> 
               <svg
                 width="18"
                 height="18"
@@ -73,37 +120,34 @@ export default function LoginPage() {
             <div className="flex-1 border-t border-slate-200" />
           </div>
 
-          {/* Form */}
-          <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+          {/* Login Form */}
+          <form className="space-y-4" onSubmit={handleLogin}>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                Email Address
-              </label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email Address</label>
               <div className="relative">
-                <Mail
-                  size={16}
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-                />
+                <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@company.com"
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-slate-50 focus:bg-white"
+                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all"
                 />
               </div>
             </div>
+
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                Password
-              </label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Password</label>
               <div className="relative">
-                <Lock
-                  size={16}
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-                />
+                <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-12 py-3 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-slate-50 focus:bg-white"
+                  className="w-full pl-10 pr-12 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all"
                 />
                 <button
                   type="button"
@@ -134,12 +178,13 @@ export default function LoginPage() {
               </Link>
             </div>
 
-            <Link
-              href="/dashboard"
-              className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl text-center transition-colors shadow-sm hover:shadow-md mt-2"
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl text-center transition-colors shadow-sm hover:shadow-md disabled:opacity-50 mt-2"
             >
-              Sign In
-            </Link>
+              {isLoading ? "Signing in..." : "Sign In"}
+            </button>
           </form>
 
           <p className="text-sm text-slate-500 text-center mt-6">
