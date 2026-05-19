@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useState } from 'react';
-import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, AlertCircle } from 'lucide-react';
 
 /* Signup Backend part */
 import { authService } from '@/services/authService';
@@ -11,21 +11,23 @@ import { useRouter } from 'next/navigation';
 
 export default function SignupPage() {
   const [formData, setFormData] = useState({ fullName: '', email: '', password: '' });
-  const [isAgreed, setIsAgreed] = useState(false); // Checkbox state 
+  const [isAgreed, setIsAgreed] = useState(false); 
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null); // Dynamic error mapping state
   const router = useRouter();
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage(null); // Clear previous errors
+    
     if (!isAgreed) {
-      alert("Please agree to the Terms and Privacy Policy first.");
+      setErrorMessage("Please agree to the Terms of Service and Privacy Policy first.");
       return;
     }
     
     setIsLoading(true);
     try {
-      // Split full name into first and last name for the backend
       const nameParts = formData.fullName.trim().split(' ');
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
@@ -40,22 +42,25 @@ export default function SignupPage() {
       );
       router.push("/dashboard"); 
     } catch (err: any) {
-      alert(err.response?.data?.error || "Signup failed");
+      // Professionally extracts custom exception string or server message
+      const finalMsg = err.response?.data?.error || err.message || "An unexpected registration failure occurred.";
+      setErrorMessage(finalMsg);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleGoogleSignup = async () => {
+    setErrorMessage(null);
     if (!isAgreed) {
-      alert("Please agree to the Terms and Privacy Policy first.");
+      setErrorMessage("Please agree to the Terms of Service and Privacy Policy first.");
       return;
     }
     try {
       await authService.loginWithGoogle("Agreed");
       router.push("/dashboard");
     } catch (err) {
-      alert("Google Signup failed");
+      setErrorMessage("Google account linkage failed. Please try again.");
     }
   };
 
@@ -129,6 +134,14 @@ export default function SignupPage() {
             <span className="text-xs text-slate-400 font-medium">Or continue with email</span>
             <div className="flex-1 border-t border-slate-200" />
           </div>
+
+          {/* High-Professional Inline Error Warning Block */}
+          {errorMessage && (
+            <div className="flex items-start gap-2.5 bg-red-50 text-red-600 border border-red-200 rounded-xl p-3.5 text-sm mb-5 transition-all animate-in fade-in-50 duration-200">
+              <AlertCircle size={18} className="mt-0.5 flex-shrink-0" />
+              <div className="font-medium">{errorMessage}</div>
+            </div>
+          )}
 
           {/* Form */}
           <form className="space-y-4" onSubmit={handleSignup}>
