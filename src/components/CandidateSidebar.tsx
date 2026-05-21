@@ -9,6 +9,7 @@ import {
   BarChart2,
   Briefcase,
   Settings,
+  LogOut,
   Zap,
   ChevronRight,
 } from "lucide-react";
@@ -86,6 +87,17 @@ export default function CandidateSidebar() {
         >
           <Settings size={16} />
           Settings
+        </Link>
+        <Link
+          href="/logout"
+          className={`flex items-center gap-3 px-6 py-3 text-sm font-medium transition-colors ${
+            pathname === "/logout"
+              ? "text-blue-400"
+              : "text-slate-400 hover:text-white"
+          }`}
+        >
+          <LogOut size={16} />
+          Logout
         </Link>
         <div className="flex items-center gap-3 px-5 py-4 border-t border-slate-700">
           <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
