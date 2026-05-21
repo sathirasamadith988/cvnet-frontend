@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Search,
   Briefcase,
@@ -15,6 +16,13 @@ import {
   Mail,
   Paperclip,
 } from "lucide-react";
+import {
+  ApplicationDetails,
+  ApplicationRecord,
+  createApplicationId,
+  defaultApplicationDetails,
+  saveApplicationToStorage,
+} from "@/lib/applications";
 
 type Job = {
   id: string;
@@ -85,37 +93,15 @@ const jobs: Job[] = [
 ];
 
 const candidateProfile = {
-  fullName: "Alex Johnson",
-  email: "alex.johnson@example.com",
-  phone: "+1 (555) 014-2244",
-  location: "Remote",
-  currentRole: "Senior Frontend Developer",
-  cvFileName: "alex-johnson-resume.pdf",
-  portfolio: "https://portfolio.example.com/alex-johnson",
-  availability: "2 weeks notice",
-  summary:
-    "Senior Frontend Developer with 7+ years of experience in React, TypeScript, and scalable UI systems.",
+  ...defaultApplicationDetails,
   skills: "React.js, TypeScript, Tailwind CSS, Node.js, GraphQL, AWS",
 };
 
-type QuickApplyState = {
-  fullName: string;
-  email: string;
-  phone: string;
-  location: string;
-  currentRole: string;
-  cvFileName: string;
-  portfolio: string;
-  availability: string;
-  summary: string;
-  coverLetter: string;
-};
-
 export default function JobsPage() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedJobId, setSelectedJobId] = useState(jobs[0].id);
-  const [applicationSubmitted, setApplicationSubmitted] = useState(false);
-  const [formState, setFormState] = useState<QuickApplyState>({
+  const [formState, setFormState] = useState<ApplicationDetails>({
     fullName: candidateProfile.fullName,
     email: candidateProfile.email,
     phone: candidateProfile.phone,
@@ -150,12 +136,30 @@ export default function JobsPage() {
 
   const handleQuickApply = (jobId: string) => {
     setSelectedJobId(jobId);
-    setApplicationSubmitted(false);
   };
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setApplicationSubmitted(true);
+
+    const applicationId = createApplicationId(selectedJob.id);
+    const submittedApplication: ApplicationRecord = {
+      id: applicationId,
+      jobId: selectedJob.id,
+      role: selectedJob.title,
+      company: selectedJob.company,
+      location: selectedJob.location,
+      date: new Date().toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }),
+      match: selectedJob.match,
+      status: "In Review",
+      details: formState,
+    };
+
+    saveApplicationToStorage(submittedApplication);
+    router.push(`/applications/${applicationId}`);
   };
 
   return (
@@ -487,13 +491,6 @@ export default function JobsPage() {
             >
               <Send size={15} /> Submit Application
             </button>
-
-            {applicationSubmitted && (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-                Your application draft is ready to send. This is a frontend-only
-                confirmation state for now.
-              </div>
-            )}
           </form>
         </aside>
       </div>

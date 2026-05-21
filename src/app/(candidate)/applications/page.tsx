@@ -1,104 +1,35 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search, ChevronDown, ArrowUpDown, Briefcase } from "lucide-react";
-
-type Application = {
-  role: string;
-  company: string;
-  location: string;
-  date: string;
-  match: number;
-  status: string;
-};
-
-const seedApplications: Application[] = [
-  {
-    role: "Senior Frontend Developer",
-    company: "TechCorp Inc.",
-    location: "Remote",
-    date: "Oct 24, 2023",
-    match: 92,
-    status: "In Review",
-  },
-  {
-    role: "Product Designer",
-    company: "Design Studio",
-    location: "New York",
-    date: "Oct 20, 2023",
-    match: 88,
-    status: "Interviewing",
-  },
-  {
-    role: "Senior React Engineer",
-    company: "Global Systems",
-    location: "Remote",
-    date: "Oct 18, 2023",
-    match: 65,
-    status: "Applied",
-  },
-  {
-    role: "UX Researcher",
-    company: "InnovateLab",
-    location: "San Francisco",
-    date: "Oct 15, 2023",
-    match: 95,
-    status: "Offer Received",
-  },
-  {
-    role: "Full Stack Dev",
-    company: "Future Web",
-    location: "Remote",
-    date: "Oct 12, 2023",
-    match: 45,
-    status: "Rejected",
-  },
-  {
-    role: "Backend Engineer",
-    company: "FintechFlow",
-    location: "London",
-    date: "Oct 10, 2023",
-    match: 85,
-    status: "Applied",
-  },
-  {
-    role: "Engineering Manager",
-    company: "PayGrid",
-    location: "Remote",
-    date: "Oct 8, 2023",
-    match: 72,
-    status: "In Review",
-  },
-];
-
-const statusConfig: Record<string, { bg: string; text: string }> = {
-  "In Review": { bg: "bg-amber-100", text: "text-amber-700" },
-  Interviewing: { bg: "bg-blue-100", text: "text-blue-700" },
-  Applied: { bg: "bg-slate-100", text: "text-slate-600" },
-  "Offer Received": { bg: "bg-green-100", text: "text-green-700" },
-  Rejected: { bg: "bg-red-100", text: "text-red-700" },
-};
-
-const stats = [{ label: "Total Applied", value: 24, change: "" }];
-
-function getMatchBarWidthClass(match: number) {
-  if (match >= 95) return "w-[95%]";
-  if (match >= 90) return "w-[90%]";
-  if (match >= 85) return "w-[85%]";
-  if (match >= 75) return "w-[75%]";
-  if (match >= 65) return "w-[65%]";
-  if (match >= 50) return "w-[50%]";
-  return "w-[40%]";
-}
+import {
+  ApplicationRecord,
+  defaultApplications,
+  getApplicationsFromStorage,
+  statusConfig,
+} from "@/lib/applications";
 
 export default function ApplicationsPage() {
   const [applications, setApplications] =
-    useState<Application[]>(seedApplications);
+    useState<ApplicationRecord[]>(defaultApplications);
   const [filterStatus, setFilterStatus] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const statuses = ["All", "In Review", "Interviewing", "Applied", "Rejected"];
+  useEffect(() => {
+    const syncApplications = () => {
+      setApplications(getApplicationsFromStorage());
+    };
+
+    syncApplications();
+    window.addEventListener("storage", syncApplications);
+
+    return () => {
+      window.removeEventListener("storage", syncApplications);
+    };
+  }, []);
+
+  const statuses = ["All", ...Object.keys(statusConfig)];
 
   const filtered = applications.filter((a) => {
     const matchesStatus = filterStatus === "All" || a.status === filterStatus;
@@ -107,6 +38,27 @@ export default function ApplicationsPage() {
       a.company.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesStatus && matchesSearch;
   });
+
+  const stats = useMemo(
+    () => [
+      { label: "Total Applied", value: filtered.length, change: "" },
+      {
+        label: "Rejected Applied",
+        value: filtered.filter(
+          (application) => application.status === "Rejected",
+        ).length,
+        change: "",
+      },
+      {
+        label: "Offer Received",
+        value: filtered.filter(
+          (application) => application.status === "Offer Received",
+        ).length,
+        change: "",
+      },
+    ],
+    [filtered],
+  );
 
   return (
     <div className="p-6 sm:p-8 max-w-7xl">
@@ -129,7 +81,7 @@ export default function ApplicationsPage() {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 gap-4 mb-6 sm:max-w-xs">
+      <div className="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-3">
         {stats.map(({ label, value, change }) => (
           <div
             key={label}
@@ -190,6 +142,9 @@ export default function ApplicationsPage() {
                   Role / Company
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Applied Date
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">
@@ -198,24 +153,31 @@ export default function ApplicationsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {filtered.map(({ role, company, location, date }) => (
-                <tr
-                  key={role + company}
-                  className="hover:bg-slate-50 transition-colors"
-                >
+              {filtered.map(({ id, role, company, location, date, status }) => (
+                <tr key={id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4">
                     <p className="font-semibold text-slate-900">{role}</p>
                     <p className="text-xs text-slate-400">
                       {company} · {location}
                     </p>
                   </td>
+                  <td className="px-4 py-4">
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusConfig[status].bg} ${statusConfig[status].text}`}
+                    >
+                      {statusConfig[status].label}
+                    </span>
+                  </td>
                   <td className="px-4 py-4 text-xs text-slate-500 whitespace-nowrap">
                     {date}
                   </td>
                   <td className="px-4 py-4">
-                    <button className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors">
+                    <Link
+                      href={`/applications/${id}`}
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                    >
                       View Details
-                    </button>
+                    </Link>
                   </td>
                 </tr>
               ))}

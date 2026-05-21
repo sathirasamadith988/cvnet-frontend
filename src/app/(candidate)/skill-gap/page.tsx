@@ -6,77 +6,13 @@ import {
   AlertCircle,
   TrendingUp,
   Target,
-  Code2,
 } from "lucide-react";
-
-const matchedSkills = [
-  "React",
-  "TypeScript",
-  "Tailwind",
-  "Git",
-  "Responsive Design",
-  "JavaScript",
-  "Redux",
-  "REST API",
-];
-const missingSkills = ["Docker", "GraphQL", "AWS", "Jest"];
-
-const gapBreakdown = [
-  {
-    skill: "Docker",
-    category: "Containerization",
-    demand: "High",
-    yourLevel: "None Detected",
-    required: "Intermediate",
-    status: "Critical",
-    action: "Find Course",
-  },
-  {
-    skill: "GraphQL",
-    category: "API Query Language",
-    demand: "Medium",
-    yourLevel: "Beginner",
-    required: "Advanced",
-    status: "Critical",
-    action: "Find Course",
-  },
-  {
-    skill: "AWS",
-    category: "Cloud Infrastructure",
-    demand: "High",
-    yourLevel: "None Detected",
-    required: "Intermediate",
-    status: "Critical",
-    action: "Find Course",
-  },
-  {
-    skill: "Jest",
-    category: "Testing Framework",
-    demand: "Medium",
-    yourLevel: "Beginner",
-    required: "Intermediate",
-    status: "Moderate",
-    action: "Find Course",
-  },
-  {
-    skill: "TypeScript",
-    category: "Programming Language",
-    demand: "High",
-    yourLevel: "Expert",
-    required: "Expert",
-    status: "Matched",
-    action: "Review",
-  },
-  {
-    skill: "React.js",
-    category: "Frontend Framework",
-    demand: "High",
-    yourLevel: "Beginner",
-    required: "Intermediate",
-    status: "Minor",
-    action: "Practice",
-  },
-];
+import {
+  gapBreakdown,
+  matchedSkills,
+  missingSkills,
+  skillMatchScore,
+} from "../../../lib/skill-gap-data";
 
 const statusConfig: Record<string, { bg: string; text: string }> = {
   Critical: { bg: "bg-red-100", text: "text-red-700" },
@@ -85,70 +21,46 @@ const statusConfig: Record<string, { bg: string; text: string }> = {
   Matched: { bg: "bg-green-100", text: "text-green-700" },
 };
 
-const demandConfig: Record<string, string> = {
-  High: "text-red-600 font-semibold",
-  Medium: "text-amber-600 font-semibold",
-  Low: "text-slate-500",
+const levelMap: Record<string, number> = {
+  "None Detected": 0,
+  Beginner: 1,
+  Intermediate: 2,
+  Advanced: 3,
+  Expert: 4,
 };
 
+function computeStatus(yourLevel: string, required: string) {
+  const yourNum = levelMap[yourLevel] ?? 0;
+  const reqNum = levelMap[required] ?? 0;
+  const diff = reqNum - yourNum;
+
+  if (diff <= 0) return "Matched";
+  if (diff === 1) return "Moderate";
+  return "Critical";
+}
+
 export default function SkillGapPage() {
-  const matchScore = 68;
+  const matchScore = skillMatchScore;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      {/* Header with Logo */}
-      <div className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 sm:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {/* Logo */}
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center shadow-lg">
-                <Code2 className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-lg font-bold text-slate-900">CVNet</h1>
-                <p className="text-xs text-slate-500">Career Intelligence</p>
-              </div>
-            </div>
-            <nav className="hidden md:flex items-center gap-6">
-              <Link
-                href="#"
-                className="text-sm text-slate-600 hover:text-slate-900 transition"
-              >
-                Analysis
-              </Link>
-              <Link
-                href="#"
-                className="text-sm text-slate-600 hover:text-slate-900 transition"
-              >
-                Learning Path
-              </Link>
-              <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition">
-                Profile
-              </button>
-            </nav>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen bg-linear-to-br from-slate-50 to-slate-100">
+      {/* Top header removed per design request */}
 
       <div className="p-6 sm:p-8 max-w-7xl mx-auto">
-        {/* Breadcrumb & Subtitle */}
-        <div className="mb-8">
-          <p className="text-sm text-slate-500 mb-2">
-            <span className="text-slate-400">Dashboard</span> →{" "}
-            <span className="text-blue-600 font-semibold">
-              Skill Gap Analysis
-            </span>
-          </p>
+        <div className="mb-6">
           <div className="flex items-start justify-between">
             <div>
               <h2 className="text-3xl font-extrabold text-slate-900 flex items-center gap-2">
                 <TrendingUp className="w-8 h-8 text-blue-600" />
                 Skill Gap Analysis
               </h2>
-              <p className="text-slate-500 text-sm mt-1">
+              <p className="text-slate-500 text-sm mt-2">
                 Deep dive into your market readiness and personalized
                 development roadmap
+              </p>
+              <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-100 px-3 py-2 rounded">
+                Note: These analytics are not 100% accurate and should be used
+                as guidance only — verify critical decisions independently.
               </p>
             </div>
           </div>
@@ -218,7 +130,7 @@ export default function SkillGapPage() {
 
             {/* Stats Grid */}
             <div className="grid sm:grid-cols-3 gap-3">
-              <div className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-xl p-4 text-center hover:shadow-md transition">
+              <div className="bg-linear-to-br from-green-50 to-green-100 border border-green-200 rounded-xl p-4 text-center hover:shadow-md transition">
                 <CheckCircle className="w-6 h-6 text-green-600 mx-auto mb-2" />
                 <p className="text-2xl font-extrabold text-green-700">
                   {matchedSkills.length}
@@ -227,7 +139,7 @@ export default function SkillGapPage() {
                   Matched Skills Verified
                 </p>
               </div>
-              <div className="bg-gradient-to-br from-red-50 to-red-100 border border-red-200 rounded-xl p-4 text-center hover:shadow-md transition">
+              <div className="bg-linear-to-br from-red-50 to-red-100 border border-red-200 rounded-xl p-4 text-center hover:shadow-md transition">
                 <AlertCircle className="w-6 h-6 text-red-600 mx-auto mb-2" />
                 <p className="text-2xl font-extrabold text-red-700">
                   {missingSkills.length}
@@ -236,7 +148,7 @@ export default function SkillGapPage() {
                   Missing Critical Skills
                 </p>
               </div>
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4 text-center hover:shadow-md transition">
+              <div className="bg-linear-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4 text-center hover:shadow-md transition">
                 <Zap className="w-6 h-6 text-blue-600 mx-auto mb-2" />
                 <p className="text-2xl font-extrabold text-blue-700">+12%</p>
                 <p className="text-xs text-blue-700 font-medium mt-1">
@@ -244,12 +156,74 @@ export default function SkillGapPage() {
                 </p>
               </div>
             </div>
+            {/* Pie chart showing matched vs missing skills */}
+            <div className="mt-6 bg-white border border-slate-100 rounded-xl p-4 shadow-sm text-center">
+              <h4 className="text-sm font-semibold text-slate-800 mb-3">
+                Skill Distribution
+              </h4>
+              <div className="flex items-center justify-center gap-6">
+                <div className="relative w-28 h-28">
+                  {(() => {
+                    const matched = matchedSkills.length;
+                    const missing = missingSkills.length;
+                    const total = matched + missing || 1;
+                    const matchedPct = Math.round((matched / total) * 100);
+                    const missingPct = 100 - matchedPct;
+                    const circumference = 2 * Math.PI * 34;
+                    const dashMatched = (circumference * matchedPct) / 100;
+                    const dashMissing = circumference - dashMatched;
+
+                    return (
+                      <svg viewBox="0 0 80 80" className="-rotate-90 w-28 h-28">
+                        <circle
+                          cx="40"
+                          cy="40"
+                          r="34"
+                          fill="none"
+                          stroke="#e6edf3"
+                          strokeWidth="12"
+                        />
+                        <circle
+                          cx="40"
+                          cy="40"
+                          r="34"
+                          fill="none"
+                          stroke="#10b981"
+                          strokeWidth="12"
+                          strokeDasharray={`${dashMatched} ${dashMissing}`}
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    );
+                  })()}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-sm font-bold">
+                      {matchedSkills.length}/
+                      {matchedSkills.length + missingSkills.length}
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      Matched / Total
+                    </span>
+                  </div>
+                </div>
+                <div className="text-left text-xs">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-3 h-3 rounded-full bg-green-500 inline-block" />
+                    <span className="text-slate-700">Matched Skills</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-red-500 inline-block" />
+                    <span className="text-slate-700">Missing Skills</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Learning Path & Skills Sidebar */}
           <div className="space-y-4">
             {/* Learning Path Card */}
-            <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-6 shadow-lg text-white">
+            <div className="bg-linear-to-br from-blue-600 to-blue-700 rounded-2xl p-6 shadow-lg text-white">
               <div className="flex items-start justify-between mb-3">
                 <BookOpen className="w-6 h-6 opacity-80" />
                 <span className="text-xs bg-white bg-opacity-20 px-2 py-1 rounded-full font-semibold">
@@ -312,7 +286,7 @@ export default function SkillGapPage() {
 
         {/* Detailed Gap Analysis */}
         <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition">
-          <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-slate-50">
+          <div className="px-6 py-5 border-b border-slate-100 bg-linear-to-r from-slate-50 to-slate-50">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-6 h-6 text-blue-600" />
               <h2 className="font-bold text-lg text-slate-900">
@@ -326,9 +300,6 @@ export default function SkillGapPage() {
                 <tr className="bg-slate-50 border-b border-slate-100">
                   <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     Skill / Tool
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Market Demand
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     Your Level
@@ -346,15 +317,7 @@ export default function SkillGapPage() {
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {gapBreakdown.map(
-                  ({
-                    skill,
-                    category,
-                    demand,
-                    yourLevel,
-                    required,
-                    status,
-                    action,
-                  }) => (
+                  ({ skill, category, yourLevel, required, action }) => (
                     <tr
                       key={skill}
                       className="hover:bg-blue-50 transition-colors"
@@ -363,15 +326,6 @@ export default function SkillGapPage() {
                         <p className="font-semibold text-slate-900">{skill}</p>
                         <p className="text-xs text-slate-400">{category}</p>
                       </td>
-                      <td className="px-4 py-4">
-                        <span
-                          className={`text-xs font-semibold ${demandConfig[demand]}`}
-                        >
-                          {demand === "High" && "🔴"}
-                          {demand === "Medium" && "🟡"}
-                          {demand === "Low" && "🟢"} {demand}
-                        </span>
-                      </td>
                       <td className="px-4 py-4 text-xs text-slate-600">
                         {yourLevel}
                       </td>
@@ -379,19 +333,24 @@ export default function SkillGapPage() {
                         {required}
                       </td>
                       <td className="px-4 py-4">
-                        <span
-                          className={`px-3 py-1.5 rounded-full text-xs font-semibold inline-flex items-center gap-1 ${statusConfig[status]?.bg} ${statusConfig[status]?.text}`}
-                        >
-                          {status === "Matched" ? (
-                            <>
-                              <CheckCircle size={14} /> Matched
-                            </>
-                          ) : (
-                            <>
-                              <AlertCircle size={14} /> {status} Gap
-                            </>
-                          )}
-                        </span>
+                        {(() => {
+                          const computed = computeStatus(yourLevel, required);
+                          return (
+                            <span
+                              className={`px-3 py-1.5 rounded-full text-xs font-semibold inline-flex items-center gap-1 ${statusConfig[computed]?.bg} ${statusConfig[computed]?.text}`}
+                            >
+                              {computed === "Matched" ? (
+                                <>
+                                  <CheckCircle size={14} /> Matched
+                                </>
+                              ) : (
+                                <>
+                                  <AlertCircle size={14} /> {computed} Gap
+                                </>
+                              )}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-4">
                         <button className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition">
