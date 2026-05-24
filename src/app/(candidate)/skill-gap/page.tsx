@@ -268,7 +268,7 @@ export default function SkillGapPage() {
             <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition">
               <div className="flex items-center gap-2 mb-3">
                 <AlertCircle className="w-5 h-5 text-red-600" />
-                <h3 className="font-bold text-slate-900">Missing Skills</h3>
+                <h3 className="font-bold text-slate-900">Missing Skill</h3>
               </div>
               <div className="flex flex-wrap gap-2">
                 {missingSkills.map((skill) => (
