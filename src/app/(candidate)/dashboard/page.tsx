@@ -82,6 +82,62 @@ const recentApplications = [
   },
 ];
 
+const jobCategories = [
+  "Technology & IT",
+  "Business & Management",
+  "Finance & Accounting",
+  "Marketing & Advertising",
+  "Sales & Customer Relations",
+];
+
+const rolesByCategory: Record<string, string[]> = {
+  "Technology & IT": [
+    "Frontend Developer",
+    "Backend Developer",
+    "DevOps Engineer",
+    "Data Scientist",
+  ],
+  "Business & Management": ["Product Manager", "Business Analyst"],
+  "Finance & Accounting": ["Accountant", "Financial Analyst"],
+  "Marketing & Advertising": ["Marketing Manager", "SEO Specialist"],
+  "Sales & Customer Relations": ["Sales Executive", "Account Manager"],
+};
+
+const mockApplications = [
+  {
+    role: "Senior Frontend Developer",
+    company: "TechCorp Inc.",
+    date: "Oct 24, 2023",
+    status: "In Review",
+    match: 92,
+    category: "Technology & IT",
+  },
+  {
+    role: "DevOps Engineer",
+    company: "CloudWorks",
+    date: "Nov 2, 2023",
+    status: "Applied",
+    match: 68,
+    category: "Technology & IT",
+  },
+  {
+    role: "Product Manager",
+    company: "BizCorp",
+    date: "Sep 9, 2023",
+    status: "Interview",
+    match: 75,
+    category: "Business & Management",
+  },
+  {
+    role: "Marketing Manager",
+    company: "AdWorks",
+    date: "Aug 12, 2023",
+    status: "Rejected",
+    match: 40,
+    category: "Marketing & Advertising",
+  },
+];
+
 const statusColors: Record<string, string> = {
   "In Review": "bg-amber-100 text-amber-700",
   Interview: "bg-blue-100 text-blue-700",
@@ -93,6 +149,9 @@ const statusColors: Record<string, string> = {
 export default function DashboardPage() {
   const [applications, setApplications] =
     useState<ApplicationRecord[]>(defaultApplications);
+
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedRole, setSelectedRole] = useState<string>("");
 
   useEffect(() => {
     const syncApplications = () => {
@@ -125,6 +184,62 @@ export default function DashboardPage() {
       rejects,
     };
   }, [applications]);
+
+  const availableRoles = useMemo(() => {
+    if (!selectedCategory) return Object.values(rolesByCategory).flat();
+    return rolesByCategory[selectedCategory] ?? [];
+  }, [selectedCategory]);
+
+  const filteredApplications = useMemo(() => {
+    return mockApplications.filter((a) => {
+      if (selectedCategory && a.category !== selectedCategory) return false;
+      if (
+        selectedRole &&
+        !a.role.toLowerCase().includes(selectedRole.toLowerCase())
+      )
+        return false;
+      return true;
+    });
+  }, [selectedCategory, selectedRole]);
+
+  const filteredSummary = useMemo(() => {
+    const appliedJobs = filteredApplications.filter(({ status }) =>
+      ["In Review", "Applied", "Interview", "Offer"].includes(status),
+    ).length;
+    const requests = filteredApplications.filter(
+      ({ status }) => status === "Interview",
+    ).length;
+    const rejects = filteredApplications.filter(
+      ({ status }) => status === "Rejected",
+    ).length;
+
+    return {
+      totalApplied: filteredApplications.length,
+      appliedJobs,
+      requests,
+      rejects,
+    };
+  }, [filteredApplications]);
+
+  const displayReadiness = useMemo(() => {
+    let val = readinessScore;
+    if (selectedCategory) val += 5;
+    if (selectedRole) val += 2;
+    return Math.min(100, val);
+  }, [selectedCategory, selectedRole]);
+
+  const displaySkillMatch = useMemo(() => {
+    let val = skillMatchScore;
+    if (selectedCategory) val = Math.min(100, val + 3);
+    if (selectedRole) val = Math.min(100, val + 1);
+    return val;
+  }, [selectedCategory, selectedRole]);
+
+  const displayedRecent = useMemo(() => {
+    return filteredApplications.length
+      ? filteredApplications
+      : recentApplications;
+  }, [filteredApplications]);
 
   const pieSegments = useMemo(
     () => [
@@ -177,7 +292,7 @@ export default function DashboardPage() {
   const stats = [
     {
       label: "Readiness Score",
-      value: `${readinessScore}/100`,
+      value: `${displayReadiness}/100`,
       sub: "Good",
       color: "text-blue-600",
       bg: "bg-blue-50",
@@ -185,7 +300,7 @@ export default function DashboardPage() {
     },
     {
       label: "Skill Match",
-      value: `${skillMatchScore}%`,
+      value: `${displaySkillMatch}%`,
       sub: "From skill gap analysis",
       color: "text-emerald-600",
       bg: "bg-emerald-50",
@@ -193,7 +308,9 @@ export default function DashboardPage() {
     },
     {
       label: "Total Applied Count",
-      value: String(applicationSummary.totalApplied),
+      value: String(
+        filteredSummary.totalApplied ?? applicationSummary.totalApplied,
+      ),
       sub: "Across saved applications",
       color: "text-violet-600",
       bg: "bg-violet-50",
@@ -273,7 +390,48 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats */}
+      <div className="bg-white border border-slate-100 rounded-2xl p-4 mb-6">
+        <div className="flex flex-col sm:flex-row gap-3 items-center">
+          <div className="w-full sm:w-1/2">
+            <label className="text-xs font-medium text-slate-500 mb-1 block">
+              Category
+            </label>
+            <select
+              value={selectedCategory}
+              onChange={(e) => {
+                setSelectedCategory(e.target.value);
+                setSelectedRole("");
+              }}
+              className="w-full rounded-xl border border-slate-100 px-3 py-2 text-sm"
+            >
+              <option value="">All categories</option>
+              {jobCategories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="w-full sm:w-1/2">
+            <label className="text-xs font-medium text-slate-500 mb-1 block">
+              Role
+            </label>
+            <select
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value)}
+              className="w-full rounded-xl border border-slate-100 px-3 py-2 text-sm"
+            >
+              <option value="">All roles</option>
+              {availableRoles.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         {stats.map(({ label, value, sub, color, bg, icon: Icon }) => (
           <div
@@ -490,7 +648,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {recentApplications.map(
+                {displayedRecent.map(
                   ({ role, company, date, status, match }) => (
                     <tr
                       key={role}
