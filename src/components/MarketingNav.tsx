@@ -5,11 +5,6 @@ import Image from "next/image";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 
-const navLinks = [
-  { href: "#features", label: "Features" },
-  { href: "#how-it-works", label: "How it Works" },
-];
-
 export default function MarketingNav() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -27,19 +22,6 @@ export default function MarketingNav() {
           />
           <span className="font-bold text-slate-900 text-lg">CVNet</span>
         </Link>
-
-        {/* Desktop Links */}
-        <div className="hidden md:flex items-center gap-6">
-          {navLinks.map(({ href, label }) => (
-            <Link
-              key={href}
-              href={href}
-              className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors"
-            >
-              {label}
-            </Link>
-          ))}
-        </div>
 
         {/* Auth Buttons */}
         <div className="hidden md:flex items-center gap-3">
@@ -69,15 +51,6 @@ export default function MarketingNav() {
       {/* Mobile menu */}
       {mobileOpen && (
         <div className="md:hidden bg-white border-t border-slate-100 px-4 py-3 space-y-2">
-          {navLinks.map(({ href, label }) => (
-            <Link
-              key={href}
-              href={href}
-              className="block py-2 text-sm font-medium text-slate-700 hover:text-blue-600"
-            >
-              {label}
-            </Link>
-          ))}
           <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
             <Link
               href="/login"
