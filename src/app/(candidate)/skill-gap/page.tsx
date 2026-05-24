@@ -226,7 +226,7 @@ export default function SkillGapPage() {
             <div className="bg-linear-to-br from-blue-600 to-blue-700 rounded-2xl p-6 shadow-lg text-white">
               <div className="flex items-start justify-between mb-3">
                 <BookOpen className="w-6 h-6 opacity-80" />
-                <span className="text-xs bg-white bg-opacity-20 px-2 py-1 rounded-full font-semibold">
+                <span className="text-xs bg-white text-blue-600 bg-opacity-20 px-2 py-1 rounded-full font-semibold">
                   AI Recommended
                 </span>
               </div>

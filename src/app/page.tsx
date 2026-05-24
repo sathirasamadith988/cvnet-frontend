@@ -74,10 +74,6 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-12">
             <div className="flex-1 text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-6">
-                <Star size={12} className="fill-blue-600 text-blue-600" />
-                v2.0 is now live with enhanced AI parsing
-              </div>
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-slate-900 leading-tight mb-6">
                 Bridge the Skill Gap with{" "}
                 <span className="text-blue-600">AI-Driven</span> Recruitment
