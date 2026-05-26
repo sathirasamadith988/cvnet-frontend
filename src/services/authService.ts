@@ -12,15 +12,21 @@ const API_URL = "http://localhost:5167/api";
 
 export const authService = {
   // Enhanced: Standard Email/Password Signup with explicit Error Mapping
+  // Enhanced: Standard Email/Password Signup with explicit Error Mapping
   async signUp(firstName: string, lastName: string, email: string, pass: string, role: string, agreement: string) {
     try {
-      // A. Register with Firebase
+      // A. Register with Firebase (This creates the account but leaves the name blank)
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       
-      // 🛑 FIX: Extract the secure ID token from the new Firebase session
+      // ✅ FIX: Instantly inject the combined Full Name into the new Firebase Identity
+      await updateProfile(userCredential.user, {
+        displayName: `${firstName} ${lastName}`.trim()
+      });
+      
+      // B. Extract the secure ID token from the new Firebase session
       const idToken = await userCredential.user.getIdToken();
       
-      // B. Post context data securely via API to your .NET system
+      // C. Post context data securely via API to your .NET system
       return await axios.post(`${API_URL}/Auth/signup`, {
         uid: userCredential.user.uid,
         email: email,
@@ -29,7 +35,6 @@ export const authService = {
         role: role,
         agreement: agreement
       }, {
-        // 🛑 FIX: Attach the token to the Authorization header so .NET allows the request
         headers: {
           Authorization: `Bearer ${idToken}`
         }
