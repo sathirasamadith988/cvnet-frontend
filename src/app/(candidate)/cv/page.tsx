@@ -88,7 +88,9 @@ export default function CVPage() {
         setInitialProfile(JSON.parse(JSON.stringify(mappedData))); 
         setProfile(JSON.parse(JSON.stringify(mappedData)));
       }
-    } catch (err) { console.error("Data Fetch Error:", err); }
+    } catch (err: any) { 
+      console.error("🔥 C# Server Error Details:", err.response?.data?.details || err.response?.data?.error || err.message); 
+    }
   };
 
   useEffect(() => {
