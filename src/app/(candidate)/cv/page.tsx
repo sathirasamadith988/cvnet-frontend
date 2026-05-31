@@ -45,10 +45,10 @@ export default function CVPage() {
   
   const [availableProfiles, setAvailableProfiles] = useState<any[]>([]);
   const [activeProfileId, setActiveProfileId] = useState<string>("");
-  const [masterProfileId, setMasterProfileId] = useState<string>(""); // ✅ Added to track Master CV
+  const [masterProfileId, setMasterProfileId] = useState<string>("");
 
   const [isSaving, setIsSaving] = useState(false);
-  const [isCloning, setIsCloning] = useState(false); // ✅ Added Clone Loading State
+  const [isCloning, setIsCloning] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSyncingLinkedIn, setIsSyncingLinkedIn] = useState(false);
   const [linkedInUrl, setLinkedInUrl] = useState("");
@@ -98,7 +98,6 @@ export default function CVPage() {
     return () => unsub();
   }, []);
 
-  // --- PROFILE MANAGEMENT ---
   const handleProfileSwitch = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newProfileId = e.target.value;
     setActiveProfileId(newProfileId);
@@ -110,7 +109,6 @@ export default function CVPage() {
     } catch (err) { console.error(err); }
   };
 
-  // ✅ NEW: CLONE FROM MASTER
   const handleCloneProfile = async () => {
     if(!masterProfileId || !activeProfileId) return;
     setIsCloning(true);
@@ -144,7 +142,6 @@ export default function CVPage() {
     });
   };
 
-  // --- SAVE ACTIONS ---
   const isPersonalInfoDirty = () => {
     const fields = ["fullName", "phone", "address", "gpa", "portfolioUrl", "currentOrg", "currentPosition", "personalStatement", "aboutMe"];
     return fields.some(f => profile[f] !== initialProfile[f]);
@@ -209,7 +206,6 @@ export default function CVPage() {
     } finally { setIsSaving(false); }
   };
 
-  // --- AUTOMATED SYNC ACTIONS ---
   const handlePDFUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -239,20 +235,9 @@ export default function CVPage() {
     } catch (err) { console.error(err); } finally { setIsSyncingLinkedIn(false); }
   };
 
-  const completionPercentage = useMemo(() => {
-    let filled = 0;
-    if (profile.phone || profile.address || profile.gpa || profile.fullName) filled++;
-    if (profile.portfolioUrl || profile.currentOrg || profile.currentPosition || profile.personalStatement || profile.aboutMe) filled++;
-    const arrs = [profile.skills, profile.experience, profile.education, profile.projects, profile.publications, profile.certifications, profile.memberships, profile.languages, profile.teachingExperience, profile.researchExperience, profile.awards, profile.volunteer];
-    arrs.forEach(a => { if (a && a.length > 0) filled++; });
-    return Math.round((filled / 14) * 100);
-  }, [profile]);
-
   const showSection = (s: SectionName) => activeSection === "All" || activeSection === s;
 
-  // Determine if active profile is empty (to show Clone button)
-  // Determine if we are on a targeted role (to show Clone button)
-const canCloneFromMaster = activeProfileId !== masterProfileId;
+  const canCloneFromMaster = activeProfileId !== masterProfileId;
 
   return (
     <div className="p-6 sm:p-8 max-w-7xl mx-auto">
@@ -264,7 +249,6 @@ const canCloneFromMaster = activeProfileId !== masterProfileId;
           <p className="text-slate-500 text-sm mt-0.5">Edit your Master CV or select a targeted Job Role track to customize.</p>
         </div>
         
-        {/* ✅ CLUSTERED ROLE SELECTOR UI */}
         <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 p-2 rounded-xl">
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-2">Editing Track:</span>
           <select 
@@ -289,7 +273,6 @@ const canCloneFromMaster = activeProfileId !== masterProfileId;
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
 
-          {/* ✅ CLONE FROM MASTER BANNER */}
           {canCloneFromMaster && (
             <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 flex items-center justify-between gap-4 shadow-sm">
                 <div>
@@ -664,6 +647,20 @@ const canCloneFromMaster = activeProfileId !== masterProfileId;
               )}
               <input type="file" onChange={handlePDFUpload} disabled={isUploading} className="hidden" accept=".pdf,.docx" />
             </label>
+
+            {/* NEW SECTION FOR VIEWING CURRENT PDF */}
+            <div className="mt-4 pt-4 border-t border-slate-100">
+               <h4 className="text-xs font-bold text-slate-700 mb-2">Current Document</h4>
+               {profile.cvUrl ? (
+                  <a href={profile.cvUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 w-full bg-slate-50 hover:bg-blue-50 text-blue-600 border border-slate-200 hover:border-blue-200 font-semibold py-2 rounded-xl text-xs transition-colors">
+                    <Eye size={14}/> View Uploaded PDF
+                  </a>
+               ) : (
+                  <div className="text-center py-2 px-3 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                    <p className="text-xs text-slate-400">No PDF document found.</p>
+                  </div>
+               )}
+            </div>
           </div>
 
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
