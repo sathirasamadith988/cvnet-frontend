@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
-  Bell, TrendingUp, Briefcase, BarChart2, ArrowRight, ExternalLink, Search,
+  Bell, TrendingUp, Briefcase, BarChart2, ArrowRight, Search,
   Plus, Trash2, AlertTriangle, Loader2, Target
 } from "lucide-react";
 import axios from "axios";
@@ -11,11 +11,10 @@ import { auth } from "@/lib/firebaseConfig";
 
 const API_URL = "http://localhost:5167/api/Dashboard";
 
-// --- TYPES ---
 type Profile = { id: string; jobRole: string; isMaster?: boolean };
 type GlobalStats = { applied: number; requests: number; rejects: number };
 type RecentApp = { role: string; company: string; date: string; status: string };
-type SkillGapDetail = { skillName: string; requirementSource: string; expectedLevel: string; expectedPercentage: number; userDeclaredLevel: string; userCalculatedPercentage: number; };
+type SkillGapDetail = { skillName: string; requirementSource: string; expectedLevel: string; userDeclaredLevel: string; };
 type CategoryTrack = { categoryName: string; roles: string[] };
 
 type DashboardData = {
@@ -24,7 +23,6 @@ type DashboardData = {
   globalStats: GlobalStats;
   activeProfileData: {
     completenessPercentage: number;
-    skillMatchPercentage: number;
     roleAppliedCount: number;
     recentApps: RecentApp[];
   };
@@ -32,46 +30,32 @@ type DashboardData = {
 
 const statusColors: Record<string, string> = {
   "In Review": "bg-amber-100 text-amber-700",
-  "Interview Called": "bg-blue-100 text-blue-700",
-  "Applied": "bg-slate-100 text-slate-600",
+  "Interviewing": "bg-purple-100 text-purple-700",
+  "Pending": "bg-slate-100 text-slate-600",
   "Rejected": "bg-red-100 text-red-700",
-  "Offer": "bg-green-100 text-green-700",
+  "Offer Received": "bg-green-100 text-green-700",
 };
 
-const pieColorPalette = ["#2563eb", "#ef4444", "#f59e0b", "#10b981", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316", "#14b8a6", "#6366f1"];
+const pieColorPalette = ["#2563eb", "#ef4444", "#f59e0b"];
 
-// --- STRICT SKILL LEVEL LOGIC (A-Z EXACT MATH) ---
-const levelPercentages: Record<number, number> = { 0: 0, 1: 8, 2: 34, 3: 85 };
+// Normalizing strictly to UI-fill widths (Beginner 10%, Intermediate 40%, Expert 100%)
+const levelVisualPercentages: Record<number, number> = { 0: 0, 1: 10, 2: 40, 3: 100 };
 const levelLabels: Record<number, string> = { 0: "Missing", 1: "Beginner", 2: "Intermediate", 3: "Expert" };
 
-// Parse user level carefully (If calc % is 0, user DOES NOT have the skill)
-const parseUserLevel = (lvl?: string, calcPercent?: number) => {
-  if (!calcPercent || calcPercent === 0) return 0; 
+const parseLevel = (lvl?: string) => {
   if (!lvl) return 0;
   const lower = lvl.toLowerCase();
-  if (lower.includes("expert")) return 3;
+  if (lower.includes("expert") || lower.includes("advanced")) return 3;
   if (lower.includes("intermediate")) return 2;
   if (lower.includes("beginner")) return 1;
   return 0;
 };
 
-// Parse expected level (Default to Beginner if DB fails)
-const parseExpectedLevel = (lvl?: string) => {
-  if (!lvl) return 1;
-  const lower = lvl.toLowerCase();
-  if (lower.includes("expert")) return 3;
-  if (lower.includes("intermediate")) return 2;
-  return 1;
-};
-
-// Exact Color Matrix requested
 const getSkillGapColor = (u: number, e: number) => {
-  if (u === 0) return "bg-transparent"; // Missing -> No Color
-  if (u >= e) return "bg-emerald-400"; // Meets/Exceeds Expected -> Light Green
-  if (u === 1 && e === 3) return "bg-red-400"; // Beginner vs Expert -> Red
-  if (u === 1 && e === 2) return "bg-orange-400"; // Beginner vs Intermediate -> Orange
-  if (u === 2 && e === 3) return "bg-orange-400"; // Intermediate vs Expert -> Orange
-  return "bg-slate-300"; // Safe fallback
+  if (u === 0) return "bg-transparent";
+  if (u >= e) return "bg-emerald-400";
+  if (u === 1 && e >= 3) return "bg-red-400"; 
+  return "bg-orange-400"; 
 };
 
 export default function DashboardPage() {
@@ -79,6 +63,7 @@ export default function DashboardPage() {
   const [activeProfileId, setActiveProfileId] = useState<string>("");
   const [availableTracks, setAvailableTracks] = useState<CategoryTrack[]>([]);
   const [skillBreakdown, setSkillBreakdown] = useState<SkillGapDetail[]>([]);
+  const [matrixMatchScore, setMatrixMatchScore] = useState(0);
   
   const [targetCategory, setTargetCategory] = useState<string>("");
   const [targetRole, setTargetRole] = useState<string>("");
@@ -92,29 +77,25 @@ export default function DashboardPage() {
       if (!auth.currentUser) return;
       const idToken = await auth.currentUser.getIdToken();
       
-      // ✅ BULLETPROOF SUMMARY REWRITE: Uses the params wrapper object to secure proxy path formatting
-      const summaryConfig = {
-        headers: { Authorization: `Bearer ${idToken}` },
-        ...(profileId ? { params: { profileId } } : {})
-      };
-
+      const summaryConfig = { headers: { Authorization: `Bearer ${idToken}` }, ...(profileId ? { params: { profileId } } : {}) };
       const res = await axios.get(`${API_URL}/summary`, summaryConfig);
       setData(res.data);
       
       const currentActiveId = profileId || res.data?.activeProfileId;
-      
       if (currentActiveId) {
         setActiveProfileId(currentActiveId);
         
-        // ✅ COMBINED PARAMETERS FOR MATRICES: Pulls directly from the Route structure configured in backend
+        // Grabs the newly implemented mathematical breakdown
         const matrixRes = await axios.get(`${API_URL}/readiness-matrix`, {
           headers: { Authorization: `Bearer ${idToken}` },
           params: { profileId: currentActiveId }
         });
+        
         setSkillBreakdown(matrixRes.data?.breakdown || []);
+        setMatrixMatchScore(matrixRes.data?.matchScore || 0); // Override naive summary percentage
       }
     } catch (err: any) {
-      console.error("Dashboard payload loading failure:", err.response?.data?.error || err.message);
+      console.error("Dashboard payload loading failure:", err);
     } finally {
       setIsLoading(false);
     }
@@ -124,27 +105,21 @@ export default function DashboardPage() {
     try {
       if (!auth.currentUser) return;
       const idToken = await auth.currentUser.getIdToken();
-      const res = await axios.get(`${API_URL}/available-tracks`, {
-        headers: { Authorization: `Bearer ${idToken}` }
-      });
+      const res = await axios.get(`${API_URL}/available-tracks`, { headers: { Authorization: `Bearer ${idToken}` } });
       setAvailableTracks(res.data || []);
       if (res.data && res.data.length > 0) {
         setTargetCategory(res.data[0].categoryName);
         setTargetRole(res.data[0].roles[0] || "");
       }
     } catch (err: any) {
-      console.error("Failed to load metrics:", err.response?.data?.error || err.message);
+      console.error("Failed to load metrics:", err);
     }
   };
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user) { 
-        loadTrackMeta(); 
-        fetchDashboardData(); 
-      } else {
-        setIsLoading(false);
-      }
+      if (user) { loadTrackMeta(); fetchDashboardData(); } 
+      else { setIsLoading(false); }
     });
     return () => unsubscribe();
   }, []);
@@ -155,9 +130,7 @@ export default function DashboardPage() {
     setIsLoading(true);
     try {
       const idToken = await auth.currentUser?.getIdToken();
-      await axios.post(`${API_URL}/roles`, { jobRole: targetRole, category: targetCategory }, {
-        headers: { Authorization: `Bearer ${idToken}` }
-      });
+      await axios.post(`${API_URL}/roles`, { jobRole: targetRole, category: targetCategory }, { headers: { Authorization: `Bearer ${idToken}` } });
       setShowAddTrack(false);
       fetchDashboardData();
     } catch (err) {
@@ -169,18 +142,14 @@ export default function DashboardPage() {
   const handleRemoveRole = async (force: boolean = false) => {
     try {
       const idToken = await auth.currentUser?.getIdToken();
-      const res = await axios.delete(`${API_URL}/roles/${activeProfileId}?force=${force}`, {
-        headers: { Authorization: `Bearer ${idToken}` }
-      });
+      const res = await axios.delete(`${API_URL}/roles/${activeProfileId}?force=${force}`, { headers: { Authorization: `Bearer ${idToken}` } });
       
       if (res.data?.isBlocked) { alert(`Blocked: ${res.data.message}`); setDeleteWarningMsg(null); return; }
       if (res.data?.needsConfirmation && !force) { setDeleteWarningMsg(res.data.message); return; }
       
       setDeleteWarningMsg(null);
       fetchDashboardData();
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) { console.error(err); }
   };
 
   const jobRoleProfiles = useMemo(() => {
@@ -191,13 +160,9 @@ export default function DashboardPage() {
     const items = [
       { label: "Applied Jobs", value: data?.globalStats?.applied || 0 },
       { label: "Rejects", value: data?.globalStats?.rejects || 0 },
-      { label: "Interview Called", value: data?.globalStats?.requests || 0 },
+      { label: "Interviewing", value: data?.globalStats?.requests || 0 },
     ].filter(item => item.value > 0);
-
-    return items.map((item, idx) => ({
-      ...item,
-      color: pieColorPalette[idx % pieColorPalette.length]
-    }));
+    return items.map((item, idx) => ({ ...item, color: pieColorPalette[idx % pieColorPalette.length] }));
   }, [data?.globalStats]);
 
   const totalApps = (data?.globalStats?.applied || 0) + (data?.globalStats?.requests || 0) + (data?.globalStats?.rejects || 0);
@@ -218,36 +183,17 @@ export default function DashboardPage() {
   const displaySkills = useMemo(() => {
     if (!skillBreakdown || skillBreakdown.length === 0) return [];
 
-    // 1. Process the Top 4 Core Job Role Skills
-    const core = skillBreakdown.slice(0, 4).map(s => {
-      const uVal = parseUserLevel(s.userDeclaredLevel, s.userCalculatedPercentage);
-      const eVal = parseExpectedLevel(s.expectedLevel);
+    // Backend already maps Top 4 Core + "Other Category Skills". Just slice and calculate visual widths.
+    return skillBreakdown.slice(0, 5).map(s => {
+      const uVal = parseLevel(s.userDeclaredLevel);
+      const eVal = parseLevel(s.expectedLevel);
       return {
         name: s.skillName,
         uVal,
         eVal,
-        expectedPercentage: levelPercentages[eVal]
+        expectedPercentage: levelVisualPercentages[eVal] || 10
       };
     });
-
-    // 2. Process the 5th "Other Skills" Job Category Bar
-    const remaining = skillBreakdown.slice(4);
-    if (remaining.length > 0) {
-      let maxUVal = 0;
-      remaining.forEach(s => {
-        const uVal = parseUserLevel(s.userDeclaredLevel, s.userCalculatedPercentage);
-        if (uVal > maxUVal) maxUVal = uVal;
-      });
-
-      core.push({
-        name: "Other Skills",
-        uVal: maxUVal,
-        eVal: 2, 
-        expectedPercentage: 34
-      });
-    }
-
-    return core;
   }, [skillBreakdown]);
 
   if (isLoading) {
@@ -355,10 +301,11 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* MATH-SYNCED SKILL MATCH */}
         <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
           <div className="flex items-center justify-between mb-3"><p className="text-sm font-medium text-slate-500">Skill Match</p><div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center"><BarChart2 size={17} className="text-emerald-600" /></div></div>
-          <p className="text-2xl font-extrabold text-emerald-600">{data?.activeProfileData?.skillMatchPercentage || 0}%</p>
-          <p className="text-xs text-slate-400 mt-1">From industry analysis</p>
+          <p className="text-2xl font-extrabold text-emerald-600">{matrixMatchScore}%</p>
+          <p className="text-xs text-slate-400 mt-1">Weighted Math Analysis out of 85%</p>
         </div>
 
         <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
@@ -374,7 +321,7 @@ export default function DashboardPage() {
         <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm mb-6 lg:mb-0">
           <div className="flex items-center justify-between mb-5">
             <div><h2 className="font-bold text-slate-900">Application Breakdown</h2><p className="text-xs text-slate-400 mt-0.5">Applied jobs, requests, and rejects</p></div>
-            <Link href="/applications/jobs" className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">Apply here <ArrowRight size={12} /></Link>
+            <Link href="/applications" className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">View Applications <ArrowRight size={12} /></Link>
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[auto_1fr] xl:items-center">
@@ -428,7 +375,7 @@ export default function DashboardPage() {
               <div className="space-y-3.5">
                 {displaySkills.map((skill, idx) => {
                   const barColor = getSkillGapColor(skill.uVal, skill.eVal);
-                  const fillPercentage = levelPercentages[skill.uVal] || 0;
+                  const fillPercentage = levelVisualPercentages[skill.uVal] || 0;
 
                   return (
                     <div key={idx} className="flex items-center gap-3">
