@@ -20,7 +20,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/cv", label: "My CV", icon: FileText },
   { href: "/skill-gap", label: "Skill Gap", icon: BarChart2 },
-  { href: "/applications", label: "Applications", icon: Briefcase },
+  { href: "/applications", label: "Applications", icon: Briefcase, badge: 3 },
 ];
 
 export default function CandidateSidebar() {
@@ -115,7 +115,7 @@ export default function CandidateSidebar() {
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto">
         <ul className="space-y-1">
-          {navItems.map(({ href, label, icon: Icon }) => {
+          {navItems.map(({ href, label, icon: Icon, badge }) => {
             const isActive = pathname === href;
             return (
               <li key={href}>
@@ -129,6 +129,11 @@ export default function CandidateSidebar() {
                 >
                   <Icon size={18} />
                   <span className="flex-1">{label}</span>
+                  {badge !== undefined && (
+                    <span className="bg-blue-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                      {badge}
+                    </span>
+                  )}
                 </Link>
               </li>
             );
