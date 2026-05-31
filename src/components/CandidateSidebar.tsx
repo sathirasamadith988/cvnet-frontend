@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { auth } from "@/lib/firebaseConfig";
 import { onAuthStateChanged, signOut, User as FirebaseUser } from "firebase/auth";
-import axios from "axios";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -27,38 +26,12 @@ export default function CandidateSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
-  
-  // State to hold the name strictly from the PostgreSQL database
-  const [dbFullName, setDbFullName] = useState<string>("Niranga Kumara"); 
 
-  // Sync the sidebar with the real Firebase User AND PostgreSQL
+  // Sync the sidebar with the real Firebase User
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
-      
-      if (user) {
-        try {
-          const token = await user.getIdToken();
-          
-          // Fetch the SQL profile row using your existing UserProfileController
-          const res = await axios.get(`http://localhost:5167/api/UserProfile/full-profile?userId=${user.uid}`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          
-          // Override the default name with the actual Postgres full_name
-          if (res.data && res.data.fullName && res.data.fullName.trim() !== "") {
-            setDbFullName(res.data.fullName);
-          } else if (user.displayName) {
-             // Safe fallback to Firebase if Postgres is empty
-            setDbFullName(user.displayName);
-          }
-        } catch (error) {
-          console.error("Failed to fetch user details from PostgreSQL:", error);
-          if (user.displayName) setDbFullName(user.displayName);
-        }
-      }
     });
-    
     return () => unsubscribe();
   }, []);
 
@@ -74,6 +47,7 @@ export default function CandidateSidebar() {
       .substring(0, 2);
   };
 
+  const displayName = currentUser?.displayName || "CVNet User";
   const profileImageUrl = currentUser?.photoURL;
 
   // ✅ LOGOUT ROUTINE
@@ -174,12 +148,12 @@ export default function CandidateSidebar() {
             />
           ) : (
             <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-              {getInitials(dbFullName)}
+              {getInitials(displayName)}
             </div>
           )}
           <div className="min-w-0">
             <p className="text-white text-sm font-semibold truncate">
-              {dbFullName}
+              {displayName}
             </p>
             <p className="text-slate-400 text-xs truncate">Candidate Account</p>
           </div>
