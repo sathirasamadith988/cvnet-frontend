@@ -1,8 +1,9 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   FileText,
@@ -10,9 +11,9 @@ import {
   Briefcase,
   Settings,
   LogOut,
-  Zap,
-  ChevronRight,
 } from "lucide-react";
+import { auth } from "@/lib/firebaseConfig";
+import { onAuthStateChanged, signOut, User as FirebaseUser } from "firebase/auth";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -23,6 +24,47 @@ const navItems = [
 
 export default function CandidateSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+
+  // Sync the sidebar with the real Firebase User
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Compute initials cleanly
+  const getInitials = (name: string) => {
+    if (!name) return "CV";
+    return name
+      .trim()
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .substring(0, 2);
+  };
+
+  const displayName = currentUser?.displayName || "CVNet User";
+  const profileImageUrl = currentUser?.photoURL;
+
+  // ✅ LOGOUT ROUTINE
+  const handleLogout = async () => {
+    try {
+      // 1. Terminate Firebase Client Session
+      await signOut(auth);
+
+      // 2. Destroy the middleware authentication cookie by setting it to a past expiration date
+      document.cookie = "cvnet_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+
+      // 3. Redirect back to the login page
+      router.push("/login");
+    } catch (error) {
+      console.error("Failed to log out cleanly:", error);
+    }
+  };
 
   return (
     <aside
@@ -71,8 +113,6 @@ export default function CandidateSidebar() {
             );
           })}
         </ul>
-
-        {/* Pro plan banner removed */}
       </nav>
 
       {/* Settings + User */}
@@ -88,24 +128,32 @@ export default function CandidateSidebar() {
           <Settings size={16} />
           Settings
         </Link>
-        <Link
-          href="/logout"
-          className={`flex items-center gap-3 px-6 py-3 text-sm font-medium transition-colors ${
-            pathname === "/logout"
-              ? "text-blue-400"
-              : "text-slate-400 hover:text-white"
-          }`}
+        
+        {/* ✅ CHANGED FROM LINK TO FUNCTIONAL BUTTON */}
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-6 py-3 text-sm font-medium text-slate-400 hover:text-white transition-colors"
         >
           <LogOut size={16} />
           Logout
-        </Link>
+        </button>
+
+        {/* ✅ DYNAMIC USER PROFILE BLOCK */}
         <div className="flex items-center gap-3 px-5 py-4 border-t border-slate-700">
-          <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-            AJ
-          </div>
+          {profileImageUrl ? (
+            <img 
+              src={profileImageUrl} 
+              alt="Avatar" 
+              className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+            />
+          ) : (
+            <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+              {getInitials(displayName)}
+            </div>
+          )}
           <div className="min-w-0">
             <p className="text-white text-sm font-semibold truncate">
-              Alex Johnson
+              {displayName}
             </p>
             <p className="text-slate-400 text-xs truncate">Candidate Account</p>
           </div>

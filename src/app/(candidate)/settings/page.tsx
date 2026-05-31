@@ -1,7 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { onAuthStateChanged, updatePassword, updateProfile, updateEmail, User as FirebaseUser } from "firebase/auth";
+import { 
+  onAuthStateChanged, 
+  updatePassword, 
+  updateProfile,
+  EmailAuthProvider, 
+  reauthenticateWithCredential,
+  signOut, 
+  updateEmail, 
+  User as FirebaseUser 
+} from "firebase/auth";
 import { auth } from "@/lib/firebaseConfig";
 import axios from "axios";
 import {
@@ -19,15 +28,15 @@ import {
 } from "lucide-react";
 
 export default function SettingsPage() {
-  // Auth & Profile States
+  // Auth & Profile States - Cleaned up to use a single Full Name source of truth
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
-  const [isEmailUser, setIsEmailUser] = useState(true); // Guards password management visibility
+  const [isEmailUser, setIsEmailUser] = useState(true);
 
   // Security UI Input States
-  const [currentPassword, setCurrentPassword] = useState(""); // Kept for interface consistency
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
@@ -41,16 +50,17 @@ export default function SettingsPage() {
     text: null,
   });
 
-  // Load and Map Authentic State Contexts upon Component Setup
+  // Load Contexts upon Component Setup
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         setCurrentUser(user);
+        
+        // Use the native Firebase displayName as the single source of truth
         setFullName(user.displayName || "");
         setEmail(user.email || "");
         setProfileImageUrl(user.photoURL || null);
 
-        // Verify if provider channel is standard credentials or social sign-on
         const provider = user.providerData.some((p) => p.providerId === "password");
         setIsEmailUser(provider);
       }
@@ -58,7 +68,7 @@ export default function SettingsPage() {
     return () => unsubscribe();
   }, []);
 
-  // Compute initials for profile placeholder avatar
+  // Compute initials cleanly from a single string
   const getInitials = (name: string) => {
     if (!name) return "CV";
     return name
@@ -72,7 +82,6 @@ export default function SettingsPage() {
 
   /**
    * 1. Profile Core Field Update Operation
-   * Synchronizes Name and Email changes with Firebase Auth and the system infrastructure.
    */
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,7 +91,7 @@ export default function SettingsPage() {
     setStatusMessage({ type: "success", text: null });
 
     try {
-      // Synchronize Identity Data inside Firebase Context Engine
+      // 1. Update Firebase Auth Context
       if (fullName !== currentUser.displayName) {
         await updateProfile(currentUser, { displayName: fullName });
       }
@@ -90,6 +99,15 @@ export default function SettingsPage() {
       if (email !== currentUser.email) {
         await updateEmail(currentUser, email);
       }
+
+      // 2. Transmit standard payload to .NET (Backend handles the NoSQL splitting)
+      const idToken = await currentUser.getIdToken();
+      await axios.put("http://localhost:5167/api/Profile/update-details", {
+        fullName: fullName,
+        email: email
+      }, {
+        headers: { Authorization: `Bearer ${idToken}` }
+      });
 
       setStatusMessage({ type: "success", text: "Profile base information updated successfully!" });
     } catch (error: any) {
@@ -108,13 +126,11 @@ export default function SettingsPage() {
 
   /**
    * 2. Multpart Form Image Core Binary Upload Relay
-   * Pipes selected binary stream into your .NET ProfileController to trigger Cloudinary AI transforms.
    */
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !currentUser) return;
 
-    // Structural enforcement checks matching .NET pipeline logic validations
     if (file.size > 5 * 1024 * 1024) {
       setStatusMessage({ type: "error", text: "File size threshold breached. Maximum file size allowed is 5MB." });
       return;
@@ -123,9 +139,7 @@ export default function SettingsPage() {
     setIsLoading(true);
     setStatusMessage({ type: "success", text: null });
 
-    // Assemble Form Payload boundaries matching [FromForm] schema requirements
     const multipartForm = new FormData();
-    multipartForm.append("userId", currentUser.uid);
     multipartForm.append("file", file);
 
     try {
@@ -133,14 +147,12 @@ export default function SettingsPage() {
       const response = await axios.post("http://localhost:5167/api/Profile/upload-image", multipartForm, {
         headers: {
           "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${idToken}`, // Secure Authorization tunnel
+          Authorization: `Bearer ${idToken}`,
         },
       });
 
       if (response.data.status === "success") {
         const structuralCloudinaryUrl = response.data.imageUrl;
-        
-        // Finalize local state context view
         await updateProfile(currentUser, { photoURL: structuralCloudinaryUrl });
         setProfileImageUrl(structuralCloudinaryUrl);
         setStatusMessage({ type: "success", text: "Professional profile avatar uploaded and synchronized successfully!" });
@@ -157,11 +169,10 @@ export default function SettingsPage() {
 
   /**
    * 3. Identity Credential Rotation Routine
-   * Validates structure constraints and commits new password values inside Firebase.
    */
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentUser) return;
+    if (!currentUser || !currentUser.email) return;
 
     if (newPassword !== confirmPassword) {
       setStatusMessage({ type: "error", text: "Password mismatch error. Confirm value must match exactly." });
@@ -177,21 +188,49 @@ export default function SettingsPage() {
     setStatusMessage({ type: "success", text: null });
 
     try {
+      const credential = EmailAuthProvider.credential(currentUser.email, currentPassword);
+      await reauthenticateWithCredential(currentUser, credential);
+
       await updatePassword(currentUser, newPassword);
+
       setStatusMessage({ type: "success", text: "Account credentials rotated successfully!" });
       setNewPassword("");
       setConfirmPassword("");
-      setCurrentPassword("");
+      setCurrentPassword(""); 
     } catch (error: any) {
-      if (error.code === "auth/requires-recent-login") {
-        setStatusMessage({
-          type: "error",
-          text: "Security verification context expired. Please re-authenticate by logging in again.",
-        });
-      } else {
-        setStatusMessage({ type: "error", text: error.message || "Failed to complete password shift operations." });
-      }
+      setStatusMessage({ type: "error", text: error.message || "Failed to complete password shift operations." });
     } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * 4. Master Account Deletion Routine
+   */
+  const handleDeactivateAccount = async () => {
+    if (!currentUser) return;
+
+    const isConfirmed = window.confirm(
+      "🚨 CRITICAL WARNING 🚨\n\nAre you absolutely sure you want to delete your account?\nThis action is PERMANENT and will destroy your profile, application history, and all data across our systems. This cannot be undone."
+    );
+
+    if (!isConfirmed) return;
+
+    setIsLoading(true);
+    try {
+      const idToken = await currentUser.getIdToken();
+
+      await axios.delete("http://localhost:5167/api/User/delete-account", {
+        headers: { Authorization: `Bearer ${idToken}` }
+      });
+
+      await signOut(auth);
+      window.location.href = "/login";
+    } catch (error: any) {
+      setStatusMessage({
+        type: "error",
+        text: error.response?.data?.error || error.message || "Failed to delete account.",
+      });
       setIsLoading(false);
     }
   };
@@ -292,7 +331,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* Editable Form Inputs Block */}
+            {/* Restored to a Professional Single Full Name Input */}
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Full Name</label>
@@ -304,6 +343,7 @@ export default function SettingsPage() {
                   className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 />
               </div>
+              
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email Address</label>
                 <input
@@ -336,10 +376,33 @@ export default function SettingsPage() {
             <p className="text-sm text-slate-400 mb-5">Secure your account with a strong password.</p>
 
             {isEmailUser ? (
-              /* Enforce Standard Email Context Modification Forms */
               <form onSubmit={handleUpdatePassword}>
                 <h3 className="text-sm font-bold text-slate-800 mb-4">Change Password</h3>
                 <div className="space-y-3 mb-5">
+                  
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                      Current Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showCurrentPassword ? "text" : "password"}
+                        placeholder="Enter current password"
+                        required
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        className="w-full px-4 pr-12 py-3 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
                       New Password
@@ -385,7 +448,6 @@ export default function SettingsPage() {
                 </button>
               </form>
             ) : (
-              /* High-Professional Alternative Visual State Block for Social SSO Entries */
               <div className="flex flex-col items-center justify-center border border-dashed border-slate-200 bg-slate-50 rounded-2xl p-8 text-center max-w-xl mx-auto my-4">
                 <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mb-4">
                   <Globe size={24} />
@@ -399,7 +461,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* TAB LAYER 3: System Notifications & Alerts Shell (Plain text context layout placeholder) */}
+        {/* TAB LAYER 3: System Notifications & Alerts Shell */}
         {activeTab === "notifications" && (
           <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
             <div className="flex items-center gap-2 mb-5">
@@ -415,7 +477,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* System Safety Border: Danger Zone (Kept as high fidelity raw plain layout placeholder) */}
+        {/* System Safety Border: Danger Zone */}
         <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
           <div className="flex items-center gap-2 mb-3">
             <AlertTriangle size={18} className="text-red-600" />
@@ -424,10 +486,17 @@ export default function SettingsPage() {
           <p className="text-sm text-red-600 mb-4">
             Once you deactivate your account, your profile and application history will be hidden from recruiters.
           </p>
-          <button type="button" className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold text-sm px-5 py-2.5 rounded-xl transition-colors">
-            <AlertTriangle size={15} /> Deactivate
+          
+          <button 
+            type="button" 
+            onClick={handleDeactivateAccount}
+            disabled={isLoading}
+            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold text-sm px-5 py-2.5 rounded-xl transition-colors disabled:opacity-50"
+          >
+            <AlertTriangle size={15} /> {isLoading ? "Deactivating..." : "Deactivate"}
           </button>
         </div>
+
       </div>
     </div>
   );

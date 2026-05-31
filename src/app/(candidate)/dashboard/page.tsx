@@ -3,707 +3,510 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
-  Bell,
-  TrendingUp,
-  Briefcase,
-  BarChart2,
-  ArrowRight,
-  ExternalLink,
-  Search,
+  Bell, TrendingUp, Briefcase, BarChart2, ArrowRight, ExternalLink, Search,
+  Plus, Trash2, AlertTriangle, Loader2, Target
 } from "lucide-react";
-import {
-  defaultApplications,
-  getApplicationsFromStorage,
-  type ApplicationRecord,
-} from "../../../lib/applications";
-import { skillMatchScore } from "../../../lib/skill-gap-data";
+import axios from "axios";
+import { auth } from "@/lib/firebaseConfig";
 
-const readinessScore = 78;
+const API_URL = "http://localhost:5167/api/Dashboard";
 
-const topMissingSkills = [
-  {
-    name: "Python",
-    priority: "Critical",
-    match: 60,
-    color: "bg-red-500",
-    widthClass: "w-[60%]",
-  },
-  {
-    name: "AWS",
-    priority: "Critical",
-    match: 45,
-    color: "bg-red-500",
-    widthClass: "w-[45%]",
-  },
-  {
-    name: "Leadership",
-    priority: "Medium",
-    match: 30,
-    color: "bg-amber-500",
-    widthClass: "w-[30%]",
-  },
-  {
-    name: "SQL",
-    priority: "Medium",
-    match: 60,
-    color: "bg-amber-500",
-    widthClass: "w-[60%]",
-  },
-  {
-    name: "Cloud Architecture",
-    priority: "Low Priority",
-    match: 20,
-    color: "bg-slate-400",
-    widthClass: "w-[20%]",
-  },
-  {
-    name: "Team Management",
-    priority: "Low Priority",
-    match: 30,
-    color: "bg-slate-400",
-    widthClass: "w-[30%]",
-  },
-];
+// --- TYPES ---
+type Profile = { id: string; jobRole: string; isMaster?: boolean };
+type GlobalStats = { applied: number; requests: number; rejects: number };
+type RecentApp = { role: string; company: string; date: string; status: string };
+type SkillGapDetail = { skillName: string; requirementSource: string; expectedLevel: string; expectedPercentage: number; userDeclaredLevel: string; userCalculatedPercentage: number; };
+type CategoryTrack = { categoryName: string; roles: string[] };
 
-const recentApplications = [
-  {
-    role: "Senior Frontend Developer",
-    company: "TechCorp Inc.",
-    date: "Oct 24, 2023",
-    status: "In Review",
-    match: 92,
-  },
-  {
-    role: "Product Designer",
-    company: "Design Studio",
-    date: "Oct 20, 2023",
-    status: "Interview",
-    match: 78,
-  },
-];
-
-const jobCategories = [
-  "Technology & IT",
-  "Business & Management",
-  "Finance & Accounting",
-  "Marketing & Advertising",
-  "Sales & Customer Relations",
-];
-
-const rolesByCategory: Record<string, string[]> = {
-  "Technology & IT": [
-    "Frontend Developer",
-    "Backend Developer",
-    "DevOps Engineer",
-    "Data Scientist",
-  ],
-  "Business & Management": ["Product Manager", "Business Analyst"],
-  "Finance & Accounting": ["Accountant", "Financial Analyst"],
-  "Marketing & Advertising": ["Marketing Manager", "SEO Specialist"],
-  "Sales & Customer Relations": ["Sales Executive", "Account Manager"],
+type DashboardData = {
+  profiles: Profile[];
+  activeProfileId: string;
+  globalStats: GlobalStats;
+  activeProfileData: {
+    completenessPercentage: number;
+    skillMatchPercentage: number;
+    roleAppliedCount: number;
+    recentApps: RecentApp[];
+  };
 };
-
-const mockApplications = [
-  {
-    role: "Senior Frontend Developer",
-    company: "TechCorp Inc.",
-    date: "Oct 24, 2023",
-    status: "In Review",
-    match: 92,
-    category: "Technology & IT",
-  },
-  {
-    role: "DevOps Engineer",
-    company: "CloudWorks",
-    date: "Nov 2, 2023",
-    status: "Applied",
-    match: 68,
-    category: "Technology & IT",
-  },
-  {
-    role: "Product Manager",
-    company: "BizCorp",
-    date: "Sep 9, 2023",
-    status: "Interview",
-    match: 75,
-    category: "Business & Management",
-  },
-  {
-    role: "Marketing Manager",
-    company: "AdWorks",
-    date: "Aug 12, 2023",
-    status: "Rejected",
-    match: 40,
-    category: "Marketing & Advertising",
-  },
-];
 
 const statusColors: Record<string, string> = {
   "In Review": "bg-amber-100 text-amber-700",
-  Interview: "bg-blue-100 text-blue-700",
-  Applied: "bg-slate-100 text-slate-600",
-  Rejected: "bg-red-100 text-red-700",
-  Offer: "bg-green-100 text-green-700",
+  "Interview Called": "bg-blue-100 text-blue-700",
+  "Applied": "bg-slate-100 text-slate-600",
+  "Rejected": "bg-red-100 text-red-700",
+  "Offer": "bg-green-100 text-green-700",
+};
+
+const pieColorPalette = ["#2563eb", "#ef4444", "#f59e0b", "#10b981", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316", "#14b8a6", "#6366f1"];
+
+// --- STRICT SKILL LEVEL LOGIC (A-Z EXACT MATH) ---
+const levelPercentages: Record<number, number> = { 0: 0, 1: 8, 2: 34, 3: 85 };
+const levelLabels: Record<number, string> = { 0: "Missing", 1: "Beginner", 2: "Intermediate", 3: "Expert" };
+
+// Parse user level carefully (If calc % is 0, user DOES NOT have the skill)
+const parseUserLevel = (lvl?: string, calcPercent?: number) => {
+  if (!calcPercent || calcPercent === 0) return 0; 
+  if (!lvl) return 0;
+  const lower = lvl.toLowerCase();
+  if (lower.includes("expert")) return 3;
+  if (lower.includes("intermediate")) return 2;
+  if (lower.includes("beginner")) return 1;
+  return 0;
+};
+
+// Parse expected level (Default to Beginner if DB fails)
+const parseExpectedLevel = (lvl?: string) => {
+  if (!lvl) return 1;
+  const lower = lvl.toLowerCase();
+  if (lower.includes("expert")) return 3;
+  if (lower.includes("intermediate")) return 2;
+  return 1;
+};
+
+// Exact Color Matrix requested
+const getSkillGapColor = (u: number, e: number) => {
+  if (u === 0) return "bg-transparent"; // Missing -> No Color
+  if (u >= e) return "bg-emerald-400"; // Meets/Exceeds Expected -> Light Green
+  if (u === 1 && e === 3) return "bg-red-400"; // Beginner vs Expert -> Red
+  if (u === 1 && e === 2) return "bg-orange-400"; // Beginner vs Intermediate -> Orange
+  if (u === 2 && e === 3) return "bg-orange-400"; // Intermediate vs Expert -> Orange
+  return "bg-slate-300"; // Safe fallback
 };
 
 export default function DashboardPage() {
-  const [applications, setApplications] =
-    useState<ApplicationRecord[]>(defaultApplications);
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [activeProfileId, setActiveProfileId] = useState<string>("");
+  const [availableTracks, setAvailableTracks] = useState<CategoryTrack[]>([]);
+  const [skillBreakdown, setSkillBreakdown] = useState<SkillGapDetail[]>([]);
+  
+  const [targetCategory, setTargetCategory] = useState<string>("");
+  const [targetRole, setTargetRole] = useState<string>("");
+  
+  const [isLoading, setIsLoading] = useState(true);
+  const [showAddTrack, setShowAddTrack] = useState(false);
+  const [deleteWarningMsg, setDeleteWarningMsg] = useState<string | null>(null);
 
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [selectedRole, setSelectedRole] = useState<string>("");
+  const fetchDashboardData = async (profileId?: string) => {
+    try {
+      if (!auth.currentUser) return;
+      const idToken = await auth.currentUser.getIdToken();
+      
+      // ✅ BULLETPROOF SUMMARY REWRITE: Uses the params wrapper object to secure proxy path formatting
+      const summaryConfig = {
+        headers: { Authorization: `Bearer ${idToken}` },
+        ...(profileId ? { params: { profileId } } : {})
+      };
+
+      const res = await axios.get(`${API_URL}/summary`, summaryConfig);
+      setData(res.data);
+      
+      const currentActiveId = profileId || res.data?.activeProfileId;
+      
+      if (currentActiveId) {
+        setActiveProfileId(currentActiveId);
+        
+        // ✅ COMBINED PARAMETERS FOR MATRICES: Pulls directly from the Route structure configured in backend
+        const matrixRes = await axios.get(`${API_URL}/readiness-matrix`, {
+          headers: { Authorization: `Bearer ${idToken}` },
+          params: { profileId: currentActiveId }
+        });
+        setSkillBreakdown(matrixRes.data?.breakdown || []);
+      }
+    } catch (err: any) {
+      console.error("Dashboard payload loading failure:", err.response?.data?.error || err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadTrackMeta = async () => {
+    try {
+      if (!auth.currentUser) return;
+      const idToken = await auth.currentUser.getIdToken();
+      const res = await axios.get(`${API_URL}/available-tracks`, {
+        headers: { Authorization: `Bearer ${idToken}` }
+      });
+      setAvailableTracks(res.data || []);
+      if (res.data && res.data.length > 0) {
+        setTargetCategory(res.data[0].categoryName);
+        setTargetRole(res.data[0].roles[0] || "");
+      }
+    } catch (err: any) {
+      console.error("Failed to load metrics:", err.response?.data?.error || err.message);
+    }
+  };
 
   useEffect(() => {
-    const syncApplications = () => {
-      setApplications(getApplicationsFromStorage());
-    };
-
-    syncApplications();
-    window.addEventListener("storage", syncApplications);
-
-    return () => {
-      window.removeEventListener("storage", syncApplications);
-    };
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) { 
+        loadTrackMeta(); 
+        fetchDashboardData(); 
+      } else {
+        setIsLoading(false);
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
-  const applicationSummary = useMemo(() => {
-    const appliedJobs = applications.filter(({ status }) =>
-      ["In Review", "Application Closed", "Offer Received"].includes(status),
-    ).length;
-    const requests = applications.filter(
-      ({ status }) => status === "Call for Interview",
-    ).length;
-    const rejects = applications.filter(
-      ({ status }) => status === "Rejected",
-    ).length;
+  const handleAddTrack = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!targetRole || !targetCategory) return;
+    setIsLoading(true);
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      await axios.post(`${API_URL}/roles`, { jobRole: targetRole, category: targetCategory }, {
+        headers: { Authorization: `Bearer ${idToken}` }
+      });
+      setShowAddTrack(false);
+      fetchDashboardData();
+    } catch (err) {
+      console.error(err);
+      setIsLoading(false);
+    }
+  };
 
-    return {
-      totalApplied: applications.length,
-      appliedJobs,
-      requests,
-      rejects,
-    };
-  }, [applications]);
+  const handleRemoveRole = async (force: boolean = false) => {
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const res = await axios.delete(`${API_URL}/roles/${activeProfileId}?force=${force}`, {
+        headers: { Authorization: `Bearer ${idToken}` }
+      });
+      
+      if (res.data?.isBlocked) { alert(`Blocked: ${res.data.message}`); setDeleteWarningMsg(null); return; }
+      if (res.data?.needsConfirmation && !force) { setDeleteWarningMsg(res.data.message); return; }
+      
+      setDeleteWarningMsg(null);
+      fetchDashboardData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-  const availableRoles = useMemo(() => {
-    if (!selectedCategory) return Object.values(rolesByCategory).flat();
-    return rolesByCategory[selectedCategory] ?? [];
-  }, [selectedCategory]);
+  const jobRoleProfiles = useMemo(() => {
+    return (data?.profiles || []).filter(p => p.jobRole !== "General CV Profile");
+  }, [data?.profiles]);
 
-  const filteredApplications = useMemo(() => {
-    return mockApplications.filter((a) => {
-      if (selectedCategory && a.category !== selectedCategory) return false;
-      if (
-        selectedRole &&
-        !a.role.toLowerCase().includes(selectedRole.toLowerCase())
-      )
-        return false;
-      return true;
-    });
-  }, [selectedCategory, selectedRole]);
+  const pieSegments = useMemo(() => {
+    const items = [
+      { label: "Applied Jobs", value: data?.globalStats?.applied || 0 },
+      { label: "Rejects", value: data?.globalStats?.rejects || 0 },
+      { label: "Interview Called", value: data?.globalStats?.requests || 0 },
+    ].filter(item => item.value > 0);
 
-  const filteredSummary = useMemo(() => {
-    const appliedJobs = filteredApplications.filter(({ status }) =>
-      ["In Review", "Applied", "Interview", "Offer"].includes(status),
-    ).length;
-    const requests = filteredApplications.filter(
-      ({ status }) => status === "Interview",
-    ).length;
-    const rejects = filteredApplications.filter(
-      ({ status }) => status === "Rejected",
-    ).length;
+    return items.map((item, idx) => ({
+      ...item,
+      color: pieColorPalette[idx % pieColorPalette.length]
+    }));
+  }, [data?.globalStats]);
 
-    return {
-      totalApplied: filteredApplications.length,
-      appliedJobs,
-      requests,
-      rejects,
-    };
-  }, [filteredApplications]);
-
-  const displayReadiness = useMemo(() => {
-    let val = readinessScore;
-    if (selectedCategory) val += 5;
-    if (selectedRole) val += 2;
-    return Math.min(100, val);
-  }, [selectedCategory, selectedRole]);
-
-  const displaySkillMatch = useMemo(() => {
-    let val = skillMatchScore;
-    if (selectedCategory) val = Math.min(100, val + 3);
-    if (selectedRole) val = Math.min(100, val + 1);
-    return val;
-  }, [selectedCategory, selectedRole]);
-
-  const displayedRecent = useMemo(() => {
-    return filteredApplications.length
-      ? filteredApplications
-      : recentApplications;
-  }, [filteredApplications]);
-
-  const pieSegments = useMemo(
-    () => [
-      {
-        label: "Applied Jobs",
-        value: applicationSummary.appliedJobs,
-        color: "#2563eb",
-        bg: "bg-blue-600",
-      },
-      {
-        label: "Rejects",
-        value: applicationSummary.rejects,
-        color: "#ef4444",
-        bg: "bg-red-500",
-      },
-      {
-        label: "Request Jobs",
-        value: applicationSummary.requests,
-        color: "#f59e0b",
-        bg: "bg-amber-500",
-      },
-    ],
-    [
-      applicationSummary.appliedJobs,
-      applicationSummary.rejects,
-      applicationSummary.requests,
-    ],
-  );
-
+  const totalApps = (data?.globalStats?.applied || 0) + (data?.globalStats?.requests || 0) + (data?.globalStats?.rejects || 0);
   const chartRadius = 44;
   const chartCircumference = 2 * Math.PI * chartRadius;
+  
   const chartSegments = useMemo(() => {
-    const total = pieSegments.reduce((sum, segment) => sum + segment.value, 0);
-
-    if (!total) {
-      return [];
-    }
-
+    if (totalApps === 0) return [];
     let consumed = 0;
-
     return pieSegments.map(({ value, color }) => {
-      const length = (value / total) * chartCircumference;
+      const length = (value / totalApps) * chartCircumference;
       const offset = consumed;
       consumed += length;
-
       return { color, length, offset };
     });
-  }, [chartCircumference, pieSegments]);
+  }, [chartCircumference, pieSegments, totalApps]);
 
-  const stats = [
-    {
-      label: "Readiness Score",
-      value: `${displayReadiness}/100`,
-      sub: "Good",
-      color: "text-blue-600",
-      bg: "bg-blue-50",
-      icon: TrendingUp,
-    },
-    {
-      label: "Skill Match",
-      value: `${displaySkillMatch}%`,
-      sub: "From skill gap analysis",
-      color: "text-emerald-600",
-      bg: "bg-emerald-50",
-      icon: BarChart2,
-    },
-    {
-      label: "Total Applied Count",
-      value: String(
-        filteredSummary.totalApplied ?? applicationSummary.totalApplied,
-      ),
-      sub: "Across saved applications",
-      color: "text-violet-600",
-      bg: "bg-violet-50",
-      icon: Briefcase,
-    },
-  ];
+  const displaySkills = useMemo(() => {
+    if (!skillBreakdown || skillBreakdown.length === 0) return [];
+
+    // 1. Process the Top 4 Core Job Role Skills
+    const core = skillBreakdown.slice(0, 4).map(s => {
+      const uVal = parseUserLevel(s.userDeclaredLevel, s.userCalculatedPercentage);
+      const eVal = parseExpectedLevel(s.expectedLevel);
+      return {
+        name: s.skillName,
+        uVal,
+        eVal,
+        expectedPercentage: levelPercentages[eVal]
+      };
+    });
+
+    // 2. Process the 5th "Other Skills" Job Category Bar
+    const remaining = skillBreakdown.slice(4);
+    if (remaining.length > 0) {
+      let maxUVal = 0;
+      remaining.forEach(s => {
+        const uVal = parseUserLevel(s.userDeclaredLevel, s.userCalculatedPercentage);
+        if (uVal > maxUVal) maxUVal = uVal;
+      });
+
+      core.push({
+        name: "Other Skills",
+        uVal: maxUVal,
+        eVal: 2, 
+        expectedPercentage: 34
+      });
+    }
+
+    return core;
+  }, [skillBreakdown]);
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center min-h-[70vh]"><Loader2 className="animate-spin text-blue-600" size={48} /></div>;
+  }
 
   return (
-    <div className="p-6 sm:p-8 max-w-7xl">
-      {/* Top bar */}
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-6 sm:p-8 max-w-7xl mx-auto">
+      
+      {deleteWarningMsg && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl">
+            <div className="flex items-center gap-3 text-rose-600 mb-3"><AlertTriangle size={24} /><h3 className="text-lg font-bold">System Warning</h3></div>
+            <p className="text-slate-600 mb-6 text-sm">{deleteWarningMsg}</p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setDeleteWarningMsg(null)} className="px-4 py-2 font-semibold text-slate-500 hover:bg-slate-50 rounded-xl">Cancel</button>
+              <button onClick={() => handleRemoveRole(true)} className="px-4 py-2 font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl">Confirm Deletion</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TOP BAR */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-900">
-            Welcome back, Alex
-          </h1>
-          <p className="text-slate-500 text-sm mt-0.5">
-            Here&apos;s what&apos;s happening with your career today.
-          </p>
+          <h1 className="text-2xl font-extrabold text-slate-900">Welcome back, {auth.currentUser?.displayName || "User"}</h1>
+          <p className="text-slate-500 text-sm mt-0.5">Here's what's happening with your career today.</p>
         </div>
         <div className="flex items-center gap-3">
-          <Link
-            href="/applications/jobs"
-            className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm transition-colors hover:bg-blue-50"
-          >
-            <Search size={16} /> Search Jobs &amp; Skills
+          <Link href="/applications/jobs" className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm transition-colors hover:bg-blue-50">
+            <Search size={16} /> Search Jobs & Skills
           </Link>
-          <button
-            aria-label="Notifications"
-            className="relative p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-          >
+          <button aria-label="Notifications" className="relative p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
             <Bell size={18} className="text-slate-600" />
             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
           </button>
         </div>
       </div>
 
-      {/* Profile Readiness Banner */}
-      <div className="bg-linear-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 mb-6 text-white">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <p className="text-blue-100 text-sm font-medium mb-1">
-              Ready for your next big role?
-            </p>
-            <p className="text-base font-semibold">
-              Your profile readiness has increased by <strong>5%</strong> this
-              week. Keep going!
-            </p>
-            <div className="flex gap-6 mt-3 text-sm">
-              <span className="flex items-center gap-1.5">
-                <TrendingUp size={14} className="text-green-300" />
-                <strong>+5%</strong> Readiness
-              </span>
-              <span className="flex items-center gap-1.5">
-                <BarChart2 size={14} className="text-blue-200" />
-                <strong>+12%</strong> Skill Match
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Briefcase size={14} className="text-violet-200" />
-                <strong>+20%</strong> Applied Jobs
-              </span>
-            </div>
-          </div>
-          <div className="flex gap-3 shrink-0">
-            <Link
-              href="/cv"
-              className="bg-white text-blue-600 font-semibold text-sm px-4 py-2 rounded-xl hover:bg-blue-50 transition-colors whitespace-nowrap"
-            >
-              View Profile
-            </Link>
-            <Link
-              href="/skill-gap"
-              className="border border-blue-300 text-white font-semibold text-sm px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors whitespace-nowrap"
-            >
-              Update Skills
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white border border-slate-100 rounded-2xl p-4 mb-6">
-        <div className="flex flex-col sm:flex-row gap-3 items-center">
+      {/* ROLE MANAGER */}
+      <div className="bg-white border border-slate-100 rounded-2xl p-5 mb-6 shadow-sm">
+        <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
           <div className="w-full sm:w-1/2">
-            <label className="text-xs font-medium text-slate-500 mb-1 block">
-              Category
-            </label>
-            <select
-              value={selectedCategory}
-              onChange={(e) => {
-                setSelectedCategory(e.target.value);
-                setSelectedRole("");
-              }}
-              className="w-full rounded-xl border border-slate-100 px-3 py-2 text-sm"
-            >
-              <option value="">All categories</option>
-              {jobCategories.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block flex items-center gap-1.5"><Target size={14}/> Active Target Role</label>
+            <div className="flex items-center gap-2">
+              <select 
+                value={activeProfileId} 
+                onChange={(e) => { 
+                  const targetId = e.target.value;
+                  setActiveProfileId(targetId); 
+                  setIsLoading(true); 
+                  fetchDashboardData(targetId); 
+                }}
+                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-blue-700 bg-slate-50 outline-none focus:border-blue-500 cursor-pointer"
+              >
+                {jobRoleProfiles.length === 0 ? <option value="">No Target Roles Configured</option> : jobRoleProfiles.map(p => <option key={p.id} value={p.id}>{p.jobRole}</option>)}
+              </select>
+              {activeProfileId && jobRoleProfiles.length > 0 && (
+                <button onClick={() => handleRemoveRole(false)} className="p-2.5 text-slate-400 hover:bg-red-50 hover:text-red-600 rounded-xl transition-colors border border-transparent hover:border-red-100">
+                  <Trash2 size={18} />
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="w-full sm:w-1/2">
-            <label className="text-xs font-medium text-slate-500 mb-1 block">
-              Role
-            </label>
-            <select
-              value={selectedRole}
-              onChange={(e) => setSelectedRole(e.target.value)}
-              className="w-full rounded-xl border border-slate-100 px-3 py-2 text-sm"
-            >
-              <option value="">All roles</option>
-              {availableRoles.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        {stats.map(({ label, value, sub, color, bg, icon: Icon }) => (
-          <div
-            key={label}
-            className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-medium text-slate-500">{label}</p>
-              <div
-                className={`w-9 h-9 rounded-xl ${bg} flex items-center justify-center`}
-              >
-                <Icon size={17} className={color} />
-              </div>
-            </div>
-            <p className={`text-2xl font-extrabold ${color}`}>{value}</p>
-            <p className="text-xs text-slate-400 mt-1">{sub}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Application Status Pie Chart */}
-      <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm mb-6">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h2 className="font-bold text-slate-900">Application Breakdown</h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Applied jobs, requests, and rejects from your frontend application
-              data
-            </p>
-          </div>
-          <Link
-            href="/applications/jobs"
-            className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-          >
-            Apply here <ArrowRight size={12} />
-          </Link>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-[auto_1fr] lg:items-center">
-          <div className="flex items-center justify-center">
-            <svg
-              viewBox="0 0 120 120"
-              className="h-48 w-48 drop-shadow-sm"
-              aria-label="Application breakdown pie chart"
-            >
-              <circle
-                cx="60"
-                cy="60"
-                r={chartRadius}
-                fill="none"
-                stroke="#e2e8f0"
-                strokeWidth="18"
-              />
-              {chartSegments.map(({ color, length, offset }) => (
-                <circle
-                  key={`${color}-${offset}`}
-                  cx="60"
-                  cy="60"
-                  r={chartRadius}
-                  fill="none"
-                  stroke={color}
-                  strokeWidth="18"
-                  strokeDasharray={`${length} ${chartCircumference - length}`}
-                  strokeDashoffset={-offset}
-                  transform="rotate(-90 60 60)"
-                  strokeLinecap="round"
-                />
-              ))}
-              <circle cx="60" cy="60" r="34" fill="white" />
-              <text
-                x="60"
-                y="57"
-                textAnchor="middle"
-                className="fill-slate-900 text-[18px] font-extrabold"
-              >
-                {applicationSummary.totalApplied}
-              </text>
-              <text
-                x="60"
-                y="72"
-                textAnchor="middle"
-                className="fill-slate-400 text-[8px] font-medium"
-              >
-                Total applied
-              </text>
-            </svg>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            {pieSegments.map(({ label, value, bg }) => (
-              <div
-                key={label}
-                className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <span className={`h-3 w-3 rounded-full ${bg}`} />
-                  <p className="text-sm font-semibold text-slate-700">
-                    {label}
-                  </p>
+            {!showAddTrack ? (
+              <button onClick={() => setShowAddTrack(true)} className="mt-6 w-full bg-slate-50 border border-slate-200 border-dashed hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 text-slate-600 font-semibold py-2.5 rounded-xl transition-colors flex justify-center items-center gap-2 text-sm">
+                <Plus size={16}/> Build New Job Target
+              </button>
+            ) : (
+              <form onSubmit={handleAddTrack} className="flex flex-col gap-2 relative bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <label className="text-xs font-bold text-slate-500">Select Category & Role</label>
+                <div className="flex gap-2">
+                  <select value={targetCategory} onChange={(e) => { setTargetCategory(e.target.value); setTargetRole(availableTracks.find(t => t.categoryName === e.target.value)?.roles[0] || ""); }} className="w-1/2 rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none">
+                    {availableTracks.map(t => <option key={t.categoryName} value={t.categoryName}>{t.categoryName}</option>)}
+                  </select>
+                  <select value={targetRole} onChange={(e) => setTargetRole(e.target.value)} className="w-1/2 rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none">
+                    {(availableTracks.find(t => t.categoryName === targetCategory)?.roles || []).map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
                 </div>
-                <p className="text-2xl font-extrabold text-slate-900">
-                  {value}
-                </p>
-                <p className="text-xs text-slate-400 mt-1">
-                  {applicationSummary.totalApplied
-                    ? Math.round(
-                        (value / applicationSummary.totalApplied) * 100,
-                      )
-                    : 0}
-                  % of total
-                </p>
-              </div>
-            ))}
+                <div className="flex gap-2 mt-1">
+                  <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-1.5 rounded-lg transition-colors">Save</button>
+                  <button type="button" onClick={() => setShowAddTrack(false)} className="flex-1 bg-white border border-slate-200 text-slate-600 font-bold text-xs py-1.5 rounded-lg transition-colors">Cancel</button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Bottom two columns */}
+      {/* STATS GRID */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-medium text-slate-500">Profile Completeness</p>
+              <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center"><TrendingUp size={17} className="text-blue-600" /></div>
+            </div>
+            <p className="text-2xl font-extrabold text-blue-600">{data?.activeProfileData?.completenessPercentage || 0}%</p>
+          </div>
+          <div className="mt-4 border-t border-slate-50 pt-3 flex items-center justify-between text-xs">
+            <span className="text-slate-400 font-medium">Click to update sections</span>
+            <Link href="/cv" className="font-bold text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-0.5">View &rarr;</Link>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-3"><p className="text-sm font-medium text-slate-500">Skill Match</p><div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center"><BarChart2 size={17} className="text-emerald-600" /></div></div>
+          <p className="text-2xl font-extrabold text-emerald-600">{data?.activeProfileData?.skillMatchPercentage || 0}%</p>
+          <p className="text-xs text-slate-400 mt-1">From industry analysis</p>
+        </div>
+
+        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-3"><p className="text-sm font-medium text-slate-500">Total Applied Count</p><div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center"><Briefcase size={17} className="text-violet-600" /></div></div>
+          <p className="text-2xl font-extrabold text-violet-600">{data?.activeProfileData?.roleAppliedCount || 0}</p>
+          <p className="text-xs text-slate-400 mt-1">For current active track</p>
+        </div>
+      </div>
+
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Skills Gap Widget */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
+        
+        {/* SVG APPLICATION BREAKDOWN */}
+        <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm mb-6 lg:mb-0">
           <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="font-bold text-slate-900">Skills Gap Analysis</h2>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Candidate vs. Job Requirements
-              </p>
-            </div>
-            <Link
-              href="/skill-gap"
-              className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-            >
-              View Details <ArrowRight size={12} />
-            </Link>
+            <div><h2 className="font-bold text-slate-900">Application Breakdown</h2><p className="text-xs text-slate-400 mt-0.5">Applied jobs, requests, and rejects</p></div>
+            <Link href="/applications/jobs" className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">Apply here <ArrowRight size={12} /></Link>
           </div>
 
-          <div className="mb-4">
-            <div className="flex justify-between text-xs text-slate-500 mb-1.5">
-              <span>React (Your Skill)</span>
-              <span>Job Requirement</span>
+          <div className="grid gap-6 xl:grid-cols-[auto_1fr] xl:items-center">
+            <div className="flex items-center justify-center">
+              <svg viewBox="0 0 120 120" className="h-48 w-48 drop-shadow-sm">
+                {totalApps === 0 ? (
+                  <circle cx="60" cy="60" r={chartRadius} fill="none" stroke="#f1f5f9" strokeWidth="18" />
+                ) : (
+                  chartSegments.map(({ color, length, offset }) => (
+                    <circle key={`${color}-${offset}`} cx="60" cy="60" r={chartRadius} fill="none" stroke={color} strokeWidth="18" strokeDasharray={`${length} ${chartCircumference - length}`} strokeDashoffset={-offset} transform="rotate(-90 60 60)" strokeLinecap="round" />
+                  ))
+                )}
+                <circle cx="60" cy="60" r="34" fill="white" />
+                <text x="60" y="57" textAnchor="middle" className="fill-slate-900 text-[18px] font-extrabold">{totalApps}</text>
+                <text x="60" y="72" textAnchor="middle" className="fill-slate-400 text-[8px] font-medium">Total tracked</text>
+              </svg>
             </div>
-            <div className="relative bg-slate-100 rounded-full h-3">
-              <div className="absolute left-0 top-0 h-full w-[70%] bg-blue-500 rounded-full" />
-              <div className="absolute top-0 h-full border-r-2 border-slate-900 left-[85%]" />
-            </div>
-          </div>
-
-          <h3 className="text-sm font-semibold text-slate-700 mb-3">
-            Top Missing Skills
-          </h3>
-          <div className="space-y-2.5">
-            {topMissingSkills
-              .slice(0, 4)
-              .map(({ name, priority, color, widthClass }) => (
-                <div key={name} className="flex items-center gap-3">
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-medium text-slate-700">
-                        {name}
-                      </span>
-                      <span
-                        className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${priority === "Critical" ? "bg-red-100 text-red-600" : priority === "Medium" ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-500"}`}
-                      >
-                        {priority}
-                      </span>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              {pieSegments.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">No applications processed yet.</p>
+              ) : (
+                pieSegments.map(({ label, value, color }) => (
+                  <div key={label} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
+                      <p className="text-xs font-bold text-slate-700">{label}</p>
                     </div>
-                    <div className="bg-slate-100 rounded-full h-1.5">
-                      <div
-                        className={`${color} h-full rounded-full ${widthClass}`}
-                      />
+                    <div className="flex items-end justify-between">
+                      <p className="text-xl font-extrabold text-slate-900">{value}</p>
+                      <p className="text-[10px] font-semibold text-slate-400 mb-1">{totalApps > 0 ? Math.round((value / totalApps) * 100) : 0}%</p>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
+            </div>
           </div>
-          <Link
-            href="/skill-gap"
-            className="mt-4 flex items-center justify-center gap-1 text-xs text-blue-600 font-semibold hover:text-blue-700"
-          >
-            Find Courses <ExternalLink size={11} />
-          </Link>
         </div>
 
-        {/* Recent Applications */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="font-bold text-slate-900">Recent Applications</h2>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Your latest job applications
-              </p>
+        {/* SKILLS GAP WIDGET */}
+        <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-5">
+              <div><h2 className="font-bold text-slate-900">Skills Gap Analysis</h2><p className="text-xs text-slate-400 mt-0.5">Candidate vs. Job Requirements</p></div>
+              <Link href="/skill-gap" className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">View Details <ArrowRight size={12} /></Link>
             </div>
-            <Link
-              href="/applications"
-              className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-            >
-              View All <ArrowRight size={12} />
-            </Link>
-          </div>
 
+            <h3 className="text-sm font-semibold text-slate-700 mb-3">Top Core Requirements</h3>
+            {(!displaySkills || displaySkills.length === 0) ? (
+              <p className="text-sm text-slate-400 py-4 text-center">No track selected or matrix is generating.</p>
+            ) : (
+              <div className="space-y-3.5">
+                {displaySkills.map((skill, idx) => {
+                  const barColor = getSkillGapColor(skill.uVal, skill.eVal);
+                  const fillPercentage = levelPercentages[skill.uVal] || 0;
+
+                  return (
+                    <div key={idx} className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-medium text-slate-700">{skill.name}</span>
+                          <span className="text-[10px] uppercase font-bold text-slate-400">
+                            {levelLabels[skill.uVal]} / {levelLabels[skill.eVal]} target
+                          </span>
+                        </div>
+                        <div className="relative bg-slate-100 rounded-full h-2 w-full">
+                          {/* User Level Fill */}
+                          <div className={`absolute top-0 bottom-0 left-0 rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${fillPercentage}%` }} />
+                          {/* Expected Level Tick */}
+                          <div className="absolute top-[-2px] bottom-[-2px] w-0.5 bg-slate-900 z-10 rounded-full" style={{ left: `${skill.expectedPercentage}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          
+          {/* COURSE RECOMMENDATION BOX */}
+          {displaySkills && displaySkills.length > 0 && displaySkills.some(s => s.uVal > 0 && s.uVal < s.eVal) && (
+            <div className="mt-5 pt-5 border-t border-slate-100">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center"><Briefcase size={15} className="text-blue-600" /></div>
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    Suggested: {displaySkills.find(s => s.uVal > 0 && s.uVal < s.eVal)?.name} Course
+                  </p>
+                  <p className="text-xs text-slate-400">Recommendation based on your top skill gap</p>
+                </div>
+              </div>
+              <Link href="/skill-gap" className="block w-full text-center bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-xs py-2.5 rounded-xl transition-colors">
+                Explore Recommended Courses
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* RECENT APPLICATIONS TABLE */}
+      <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm mt-6">
+        <div className="flex items-center justify-between mb-5">
+          <div><h2 className="font-bold text-slate-900">Recent Applications</h2><p className="text-xs text-slate-400 mt-0.5">Your latest job applications</p></div>
+          <Link href="/applications" className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">View All <ArrowRight size={12} /></Link>
+        </div>
+
+        {(!data?.activeProfileData?.recentApps || data.activeProfileData.recentApps.length === 0) ? (
+           <div className="text-center py-8 bg-slate-50 border border-dashed border-slate-200 rounded-xl"><p className="text-sm font-bold text-slate-600 mb-1">No Applications Found</p><p className="text-xs text-slate-400">Start applying to see your history tracked here.</p></div>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100">
-                  <th className="text-left pb-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    Role
-                  </th>
-                  <th className="text-left pb-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th className="text-left pb-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    Status
-                  </th>
+                  <th className="text-left pb-3 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Role & Company</th>
+                  <th className="text-left pb-3 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Date</th>
+                  <th className="text-left pb-3 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {displayedRecent.map(
-                  ({ role, company, date, status, match }) => (
-                    <tr
-                      key={role}
-                      className="hover:bg-slate-50 transition-colors"
-                    >
-                      <td className="py-3 pr-4">
-                        <p className="font-semibold text-slate-900 text-sm">
-                          {role}
-                        </p>
-                        <p className="text-xs text-slate-400">{company}</p>
-                      </td>
-                      <td className="py-3 pr-4 text-xs text-slate-500 whitespace-nowrap">
-                        {date}
-                      </td>
-                      <td className="py-3">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-semibold ${statusColors[status]}`}
-                          >
-                            {status}
-                          </span>
-                          <span className="text-xs font-bold text-blue-600">
-                            {match}%
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-                  ),
-                )}
+                {(data.activeProfileData.recentApps || []).slice(0, 5).map((app, idx) => (
+                  <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                    <td className="py-3 pr-4">
+                      <p className="font-semibold text-slate-900 text-sm">{app.role}</p>
+                      <p className="text-xs text-slate-500">{app.company}</p>
+                    </td>
+                    <td className="py-3 pr-4 text-xs font-medium text-slate-400 whitespace-nowrap">{app.date}</td>
+                    <td className="py-3"><span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-wide uppercase ${statusColors[app.status] || "bg-slate-100 text-slate-600"}`}>{app.status}</span></td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
-
-          <div className="mt-5 pt-5 border-t border-slate-100">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                <Briefcase size={15} className="text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-slate-900">
-                  Suggested: AWS Solutions Architect
-                </p>
-                <p className="text-xs text-slate-400">
-                  Course recommendation based on your gaps
-                </p>
-              </div>
-            </div>
-            <Link
-              href="/skill-gap"
-              className="block w-full text-center bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-xs py-2.5 rounded-xl transition-colors"
-            >
-              Explore Recommended Courses
-            </Link>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

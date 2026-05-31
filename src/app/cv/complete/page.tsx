@@ -94,11 +94,11 @@ export default function CompleteProfileEditor() {
   }
 
   function updateField<K extends keyof typeof data>(key: K, value: any) {
-    setData((prev) => ({ ...prev, [key]: value }));
+    setData((prev: typeof data) => ({ ...prev, [key]: value }));
   }
 
   function addExperience() {
-    setData((prev) => ({
+    setData((prev: typeof data) => ({
       ...prev,
       experience: [
         ...prev.experience,
@@ -108,14 +108,14 @@ export default function CompleteProfileEditor() {
   }
 
   function removeExperience(idx: number) {
-    setData((prev) => ({
+    setData((prev: typeof data) => ({
       ...prev,
-      experience: prev.experience.filter((_, i) => i !== idx),
+      experience: prev.experience.filter((_: any, i: number) => i !== idx),
     }));
   }
 
   function updateExperience(idx: number, field: string, value: any) {
-    setData((prev) => {
+    setData((prev: typeof data) => {
       const exp = [...prev.experience];
       // @ts-ignore
       exp[idx][field] = value;
@@ -124,7 +124,7 @@ export default function CompleteProfileEditor() {
   }
 
   function addBullet(idx: number) {
-    setData((prev) => {
+    setData((prev: typeof data) => {
       const exp = [...prev.experience];
       exp[idx].bullets.push("");
       return { ...prev, experience: exp };
@@ -132,7 +132,7 @@ export default function CompleteProfileEditor() {
   }
 
   function updateBullet(expIdx: number, bIdx: number, value: string) {
-    setData((prev) => {
+    setData((prev: typeof data) => {
       const exp = [...prev.experience];
       exp[expIdx].bullets[bIdx] = value;
       return { ...prev, experience: exp };
@@ -140,15 +140,15 @@ export default function CompleteProfileEditor() {
   }
 
   function removeBullet(expIdx: number, bIdx: number) {
-    setData((prev) => {
+    setData((prev: typeof data) => {
       const exp = [...prev.experience];
-      exp[expIdx].bullets = exp[expIdx].bullets.filter((_, i) => i !== bIdx);
+      exp[expIdx].bullets = exp[expIdx].bullets.filter((_: any, i: number) => i !== bIdx);
       return { ...prev, experience: exp };
     });
   }
 
   function addSkill() {
-    setData((prev) => ({
+    setData((prev: typeof data) => ({
       ...prev,
       skills: [...prev.skills, { name: "", level: "Intermediate" }],
     }));
@@ -159,7 +159,7 @@ export default function CompleteProfileEditor() {
     field: "name" | "level",
     value: string,
   ) {
-    setData((prev) => {
+    setData((prev: typeof data) => {
       const s = [...prev.skills];
       s[idx] = { ...s[idx], [field]: value };
       return { ...prev, skills: s };
@@ -167,14 +167,14 @@ export default function CompleteProfileEditor() {
   }
 
   function removeSkill(idx: number) {
-    setData((prev) => ({
+    setData((prev: typeof data) => ({
       ...prev,
       skills: prev.skills.filter((_: any, i: number) => i !== idx),
     }));
   }
 
   function addProject() {
-    setData((prev) => ({
+    setData((prev: typeof data) => ({
       ...prev,
       projects: [
         ...(prev.projects || []),
@@ -184,14 +184,14 @@ export default function CompleteProfileEditor() {
   }
 
   function removeProject(idx: number) {
-    setData((prev) => ({
+    setData((prev: typeof data) => ({
       ...prev,
       projects: (prev.projects || []).filter((_: any, i: number) => i !== idx),
     }));
   }
 
   function updateProjectField(idx: number, field: string, value: string) {
-    setData((prev) => {
+    setData((prev: typeof data) => {
       const ps = [...(prev.projects || [])];
       ps[idx] = { ...ps[idx], [field]: value };
       return { ...prev, projects: ps };
@@ -200,7 +200,7 @@ export default function CompleteProfileEditor() {
 
   function removeSection(key: keyof typeof data) {
     // set the section to empty/default
-    setData((prev) => ({
+    setData((prev: typeof data) => ({
       ...prev,
       [key]:
         key === "experience"
@@ -383,7 +383,7 @@ export default function CompleteProfileEditor() {
             </div>
 
             <div className="space-y-4">
-              {data.experience.map((exp, idx) => (
+              {data.experience.map((exp: any, idx: number) => (
                 <div
                   key={idx}
                   className="rounded-xl border border-slate-100 p-4"
@@ -428,7 +428,7 @@ export default function CompleteProfileEditor() {
                   </div>
 
                   <div className="space-y-2">
-                    {exp.bullets.map((b, bIdx) => (
+                    {exp.bullets.map((b: any, bIdx: number) => (
                       <div key={bIdx} className="flex gap-2 items-center">
                         <input
                           value={b}
