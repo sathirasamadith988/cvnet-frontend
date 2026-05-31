@@ -1,1162 +1,685 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import {
-  Award,
-  BookOpen,
-  Briefcase,
-  Download,
-  Eye,
-  FileText,
-  GraduationCap,
-  Globe,
-  Languages,
-  Link2,
-  Plus,
-  Upload,
-  Users,
+  Award, BookOpen, Briefcase, Download, Eye, FileText, GraduationCap,
+  Globe, Languages, Link2, Plus, Upload, Users, Loader2, RefreshCw, Trash2, CheckCircle2, Copy
 } from "lucide-react";
+import axios from "axios";
+import { auth } from "@/lib/firebaseConfig";
 
 type SectionName =
-  | "All"
-  | "Personal Info"
-  | "Experience"
-  | "Education"
-  | "Skills"
-  | "Certifications"
-  | "Languages"
-  | "Projects"
-  | "Publications"
-  | "Teaching"
-  | "Research"
-  | "Awards"
-  | "Volunteer"
-  | "Memberships"
-  | "Social Links";
+  | "All" | "Personal Info" | "Experience" | "Education" | "Skills"
+  | "Certifications" | "Languages" | "Projects" | "Publications"
+  | "Teaching" | "Research" | "Awards" | "Volunteer" | "Memberships" | "Social Links";
 
-type CVProfile = {
-  fullName: string;
-  email: string;
-  jobrole: string;
-  phone: string;
-  address: string;
-  portfolioUrl: string;
-  gpa: string;
-  employmentStatus: string;
-  currentOrg: string;
-  currentPosition: string;
-  personalStatement: string;
-  aboutMe: string;
-  socialLinks: Array<{ platformName: string; profileUrl: string }>;
-  skills: Array<{ skillName: string; level: string }>;
-  experience: Array<{
-    roleTitle: string;
-    companyName: string;
-    startDate: string;
-    endDate: string;
-    roleDescription: string;
-  }>;
-  education: Array<{
-    degreeTitle: string;
-    fieldOfStudy: string;
-    organization: string;
-    startDate: string;
-    endDate: string;
-    honors: string;
-    thesisTitle: string;
-    relevantCoursework: string;
-  }>;
-  certifications: Array<{
-    organization: string;
-    field: string;
-    issueDate: string;
-  }>;
-  memberships: Array<{ organizationName: string }>;
-  languages: Array<{ languageName: string; proficiency: string }>;
-  projects: Array<{
-    name: string;
-    description: string;
-    timePeriod: string;
-    role: string;
-    organization: string;
-    sourceLink: string;
-  }>;
-  publications: Array<{
-    title: string;
-    description: string;
-    sourceLink: string;
-    organization: string;
-    year: string;
-  }>;
-  teachingExperience: Array<{
-    coursesTaught: string;
-    organization: string;
-    timePeriod: string;
-    curriculumDescription: string;
-  }>;
-  researchExperience: Array<{
-    projectName: string;
-    labOrFieldWork: string;
-    organization: string;
-    resultsDescription: string;
-    linkedPublication: string;
-  }>;
-  awards: Array<{
-    awardName: string;
-    organization: string;
-    description: string;
-  }>;
-  volunteer: Array<{
-    organization: string;
-    role: string;
-    description: string;
-  }>;
+const toSnakeCase = (obj: any) => {
+  const snakeObj: any = {};
+  for (const key in obj) {
+    const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+    snakeObj[snakeKey] = obj[key];
+  }
+  return snakeObj;
 };
 
-const STORAGE_KEYS = ["publicCV-v2", "publicCV"];
-
-const defaultProfile: CVProfile = {
-  fullName: "John Doe",
-  email: "john.doe@example.com",
-  jobrole: "Senior Frontend Developer",
-  phone: "+1 (555) 014-2244",
-  address: "San Francisco, CA",
-  portfolioUrl: "https://portfolio.example.com/john-doe",
-  gpa: "3.82",
-  employmentStatus: "Employed",
-  currentOrg: "TechFlow Solutions",
-  currentPosition: "Senior Frontend Developer",
-  personalStatement:
-    "Senior Frontend Developer with 7+ years building scalable web applications and accessible product experiences.",
-  aboutMe:
-    "I enjoy turning complex workflows into calm, high-confidence interfaces and mentoring teammates on maintainable frontend architecture.",
-  socialLinks: [
-    { platformName: "LinkedIn", profileUrl: "https://linkedin.com/in/johndoe" },
-    { platformName: "GitHub", profileUrl: "https://github.com/johndoe" },
-    {
-      platformName: "Portfolio",
-      profileUrl: "https://portfolio.example.com/john-doe",
-    },
-  ],
-  skills: [
-    { skillName: "React", level: "Expert" },
-    { skillName: "TypeScript", level: "Expert" },
-    { skillName: "Tailwind CSS", level: "Intermediate" },
-    { skillName: "GraphQL", level: "Intermediate" },
-    { skillName: "AWS", level: "Beginner" },
-  ],
-  experience: [
-    {
-      roleTitle: "Senior Frontend Developer",
-      companyName: "TechFlow Solutions",
-      startDate: "Jan 2021",
-      endDate: "Present",
-      roleDescription:
-        "Led a team of 5 developers in redesigning the core product dashboard using React and TypeScript. Improved application performance by 40% through code splitting and lazy loading.",
-    },
-    {
-      roleTitle: "UI/UX Developer",
-      companyName: "Creative Agency X",
-      startDate: "Jun 2018",
-      endDate: "Dec 2020",
-      roleDescription:
-        "Collaborated with designers to translate Figma prototypes into responsive web interfaces and maintained the internal component library.",
-    },
-  ],
-  education: [
-    {
-      degreeTitle: "Master of Computer Science",
-      fieldOfStudy: "Computer Science",
-      organization: "Stanford University",
-      startDate: "2016",
-      endDate: "2018",
-      honors: "Distinction",
-      thesisTitle: "Design Systems for Large-Scale Product Teams",
-      relevantCoursework:
-        "Human-computer interaction, distributed systems, advanced frontend engineering",
-    },
-    {
-      degreeTitle: "Bachelor of Science",
-      fieldOfStudy: "Information Technology",
-      organization: "University of Technology",
-      startDate: "2012",
-      endDate: "2016",
-      honors: "Dean's List",
-      thesisTitle: "Progressive Web Applications",
-      relevantCoursework: "Databases, UI engineering, software testing",
-    },
-  ],
-  certifications: [
-    {
-      organization: "Google",
-      field: "Professional Cloud Developer",
-      issueDate: "2023",
-    },
-    {
-      organization: "Meta",
-      field: "Frontend Developer Professional Certificate",
-      issueDate: "2022",
-    },
-  ],
-  memberships: [
-    { organizationName: "Association for Computing Machinery" },
-    { organizationName: "Frontend Developers Guild" },
-  ],
-  languages: [
-    { languageName: "English", proficiency: "Expert" },
-    { languageName: "Arabic", proficiency: "Intermediate" },
-    { languageName: "French", proficiency: "Beginner" },
-  ],
-  projects: [
-    {
-      name: "DesignOps Portal",
-      description:
-        "Built an internal operations dashboard for design and engineering teams with role-aware workflows.",
-      timePeriod: "2023",
-      role: "Lead Frontend Engineer",
-      organization: "TechFlow Solutions",
-      sourceLink: "https://example.com/designops",
-    },
-    {
-      name: "Candidate Hub",
-      description:
-        "Shipped a CV and application tracking interface with analytics, filters, and export flows.",
-      timePeriod: "2022",
-      role: "Full Stack Contributor",
-      organization: "CV.net",
-      sourceLink: "https://example.com/candidate-hub",
-    },
-  ],
-  publications: [
-    {
-      title: "Accessible Component Systems for Growing Teams",
-      description:
-        "A practical guide to scaling accessible design systems across product teams.",
-      sourceLink: "https://example.com/publication/accessibility-systems",
-      organization: "Frontend Journal",
-      year: "2024",
-    },
-  ],
-  teachingExperience: [
-    {
-      coursesTaught: "Modern Frontend Architecture",
-      organization: "Tech Academy",
-      timePeriod: "2024",
-      curriculumDescription:
-        "Covered component architecture, state management, accessibility, and testing strategies.",
-    },
-  ],
-  researchExperience: [
-    {
-      projectName: "Interface Friction Study",
-      labOrFieldWork: "Usability lab",
-      organization: "Product Research Lab",
-      resultsDescription:
-        "Identified interaction patterns that reduced task completion time in dense dashboard experiences.",
-      linkedPublication: "Accessible Component Systems for Growing Teams",
-    },
-  ],
-  awards: [
-    {
-      awardName: "Engineering Excellence Award",
-      organization: "TechFlow Solutions",
-      description: "Recognized for leadership on the core product redesign.",
-    },
-  ],
-  volunteer: [
-    {
-      organization: "Code for Good",
-      role: "Mentor",
-      description:
-        "Supported students building their first accessible web apps.",
-    },
-  ],
-};
-
-function hasText(value: unknown) {
-  return typeof value === "string" ? value.trim().length > 0 : Boolean(value);
-}
-
-function pickString(...values: unknown[]) {
-  for (const value of values) {
-    if (typeof value === "string" && value.trim()) {
-      return value.trim();
-    }
-    if (typeof value === "number" && Number.isFinite(value)) {
-      return String(value);
-    }
-  }
-  return "";
-}
-
-function isLegacyExperienceItem(item: Record<string, unknown>) {
+const SaveControls = ({ isDirty, onSave, onDiscard, isSaving }: { isDirty: boolean, onSave: () => void, onDiscard: () => void, isSaving: boolean }) => {
+  if (!isDirty) return null;
   return (
-    hasText(item.title) || hasText(item.company) || Array.isArray(item.bullets)
-  );
-}
-
-function normalizeProfile(raw: unknown): CVProfile {
-  const source = (raw ?? {}) as Record<string, unknown>;
-
-  return {
-    ...defaultProfile,
-    fullName: pickString(source.fullName, source.name, defaultProfile.fullName),
-    email: pickString(source.email, defaultProfile.email),
-    jobrole: pickString(
-      source.jobrole,
-      source.currentRole,
-      defaultProfile.jobrole,
-    ),
-    phone: pickString(source.phone, defaultProfile.phone),
-    address: pickString(source.address, defaultProfile.address),
-    portfolioUrl: pickString(
-      source.portfolioUrl,
-      source.portfolio,
-      defaultProfile.portfolioUrl,
-    ),
-    gpa: pickString(source.gpa, defaultProfile.gpa),
-    employmentStatus: pickString(
-      source.employmentStatus,
-      defaultProfile.employmentStatus,
-    ),
-    currentOrg: pickString(source.currentOrg, defaultProfile.currentOrg),
-    currentPosition: pickString(
-      source.currentPosition,
-      source.subtitle,
-      defaultProfile.currentPosition,
-    ),
-    personalStatement: pickString(
-      source.personalStatement,
-      source.summary,
-      defaultProfile.personalStatement,
-    ),
-    aboutMe: pickString(source.aboutMe, defaultProfile.aboutMe),
-    socialLinks: Array.isArray(source.socialLinks)
-      ? source.socialLinks
-          .map((item) => item as Record<string, unknown>)
-          .map((item) => ({
-            platformName: pickString(item.platformName, item.platform, ""),
-            profileUrl: pickString(item.profileUrl, item.url, ""),
-          }))
-          .filter(
-            (item) => hasText(item.platformName) || hasText(item.profileUrl),
-          )
-      : defaultProfile.socialLinks,
-    skills: Array.isArray(source.skills)
-      ? source.skills
-          .map((item) => {
-            if (typeof item === "string") {
-              return { skillName: item.trim(), level: "" };
-            }
-
-            const record = item as Record<string, unknown>;
-            return {
-              skillName: pickString(record.skillName, record.name, ""),
-              level: pickString(record.level, ""),
-            };
-          })
-          .filter((item) => hasText(item.skillName))
-      : defaultProfile.skills,
-    experience: Array.isArray(source.experience)
-      ? source.experience
-          .map((item) => item as Record<string, unknown>)
-          .filter(isLegacyExperienceItem)
-          .map((item) => ({
-            roleTitle: pickString(
-              item.roleTitle,
-              item.title,
-              defaultProfile.experience[0].roleTitle,
-            ),
-            companyName: pickString(item.companyName, item.company, ""),
-            startDate: pickString(item.startDate, ""),
-            endDate: pickString(item.endDate, item.period, ""),
-            roleDescription: pickString(
-              item.roleDescription,
-              Array.isArray(item.bullets)
-                ? (item.bullets as unknown[]).filter(hasText).join(" ")
-                : "",
-              "",
-            ),
-          }))
-          .filter(
-            (item) =>
-              hasText(item.roleTitle) ||
-              hasText(item.companyName) ||
-              hasText(item.roleDescription),
-          )
-      : defaultProfile.experience,
-    education: Array.isArray(source.education)
-      ? source.education
-          .map((item) => item as Record<string, unknown>)
-          .map((item) => ({
-            degreeTitle: pickString(item.degreeTitle, item.degree, ""),
-            fieldOfStudy: pickString(item.fieldOfStudy, ""),
-            organization: pickString(item.organization, item.school, ""),
-            startDate: pickString(item.startDate, ""),
-            endDate: pickString(item.endDate, item.period, ""),
-            honors: pickString(item.honors, ""),
-            thesisTitle: pickString(item.thesisTitle, ""),
-            relevantCoursework: pickString(item.relevantCoursework, ""),
-          }))
-          .filter(
-            (item) => hasText(item.degreeTitle) || hasText(item.organization),
-          )
-      : defaultProfile.education,
-    certifications: Array.isArray(source.certifications)
-      ? source.certifications
-          .map((item) => item as Record<string, unknown>)
-          .map((item) => ({
-            organization: pickString(item.organization, ""),
-            field: pickString(item.field, ""),
-            issueDate: pickString(item.issueDate, ""),
-          }))
-          .filter((item) => hasText(item.organization) || hasText(item.field))
-      : defaultProfile.certifications,
-    memberships: Array.isArray(source.memberships)
-      ? source.memberships
-          .map((item) => item as Record<string, unknown>)
-          .map((item) => ({
-            organizationName: pickString(
-              item.organizationName,
-              item.organization,
-              "",
-            ),
-          }))
-          .filter((item) => hasText(item.organizationName))
-      : defaultProfile.memberships,
-    languages: Array.isArray(source.languages)
-      ? source.languages
-          .map((item) => item as Record<string, unknown>)
-          .map((item) => ({
-            languageName: pickString(item.languageName, item.name, ""),
-            proficiency: pickString(item.proficiency, ""),
-          }))
-          .filter((item) => hasText(item.languageName))
-      : defaultProfile.languages,
-    projects: Array.isArray(source.projects)
-      ? source.projects
-          .map((item) => item as Record<string, unknown>)
-          .map((item) => ({
-            name: pickString(item.name, ""),
-            description: pickString(item.description, ""),
-            timePeriod: pickString(item.timePeriod, ""),
-            role: pickString(item.role, ""),
-            organization: pickString(item.organization, ""),
-            sourceLink: pickString(item.sourceLink, item.link, ""),
-          }))
-          .filter((item) => hasText(item.name) || hasText(item.description))
-      : defaultProfile.projects,
-    publications: Array.isArray(source.publications)
-      ? source.publications
-          .map((item) => item as Record<string, unknown>)
-          .map((item) => ({
-            title: pickString(item.title, ""),
-            description: pickString(item.description, ""),
-            sourceLink: pickString(item.sourceLink, item.link, ""),
-            organization: pickString(item.organization, ""),
-            year: pickString(item.year, ""),
-          }))
-          .filter((item) => hasText(item.title) || hasText(item.description))
-      : defaultProfile.publications,
-    teachingExperience: Array.isArray(source.teachingExperience)
-      ? source.teachingExperience
-          .map((item) => item as Record<string, unknown>)
-          .map((item) => ({
-            coursesTaught: pickString(item.coursesTaught, ""),
-            organization: pickString(item.organization, ""),
-            timePeriod: pickString(item.timePeriod, ""),
-            curriculumDescription: pickString(item.curriculumDescription, ""),
-          }))
-          .filter(
-            (item) => hasText(item.coursesTaught) || hasText(item.organization),
-          )
-      : defaultProfile.teachingExperience,
-    researchExperience: Array.isArray(source.researchExperience)
-      ? source.researchExperience
-          .map((item) => item as Record<string, unknown>)
-          .map((item) => ({
-            projectName: pickString(item.projectName, ""),
-            labOrFieldWork: pickString(item.labOrFieldWork, ""),
-            organization: pickString(item.organization, ""),
-            resultsDescription: pickString(item.resultsDescription, ""),
-            linkedPublication: pickString(item.linkedPublication, ""),
-          }))
-          .filter(
-            (item) =>
-              hasText(item.projectName) || hasText(item.resultsDescription),
-          )
-      : defaultProfile.researchExperience,
-    awards: Array.isArray(source.awards)
-      ? source.awards
-          .map((item) => item as Record<string, unknown>)
-          .map((item) => ({
-            awardName: pickString(item.awardName, ""),
-            organization: pickString(item.organization, ""),
-            description: pickString(item.description, ""),
-          }))
-          .filter(
-            (item) => hasText(item.awardName) || hasText(item.description),
-          )
-      : defaultProfile.awards,
-    volunteer: Array.isArray(source.volunteer)
-      ? source.volunteer
-          .map((item) => item as Record<string, unknown>)
-          .map((item) => ({
-            organization: pickString(item.organization, ""),
-            role: pickString(item.role, ""),
-            description: pickString(item.description, ""),
-          }))
-          .filter((item) => hasText(item.organization) || hasText(item.role))
-      : defaultProfile.volunteer,
-  };
-}
-
-function loadProfile() {
-  if (typeof window === "undefined") {
-    return defaultProfile;
-  }
-
-  for (const key of STORAGE_KEYS) {
-    try {
-      const raw = window.localStorage.getItem(key);
-      if (raw) {
-        return normalizeProfile(JSON.parse(raw));
-      }
-    } catch {
-      // Ignore malformed persisted data and fall back to defaults.
-    }
-  }
-
-  return defaultProfile;
-}
-
-function sectionButtonClass(isActive: boolean) {
-  return isActive
-    ? "bg-blue-600 text-white border-blue-600"
-    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50";
-}
-
-function SectionCard({
-  icon,
-  title,
-  children,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-          {icon}
-        </div>
-        <h3 className="font-bold text-slate-900">{title}</h3>
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function InfoPill({ label, value }: { label: string; value: string }) {
-  if (!hasText(value)) {
-    return null;
-  }
-
-  return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-      <p className="text-[11px] uppercase tracking-wide text-slate-400">
-        {label}
-      </p>
-      <p className="text-sm font-semibold text-slate-900">{value}</p>
+    <div className="flex gap-3 mt-5 pt-5 border-t border-slate-100">
+      <button onClick={onSave} disabled={isSaving} className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white px-5 py-2 rounded-xl text-sm font-bold transition-colors flex items-center gap-2">
+        {isSaving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />} Save Changes
+      </button>
+      <button onClick={onDiscard} disabled={isSaving} className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-2 rounded-xl text-sm font-bold transition-colors">
+        Discard
+      </button>
     </div>
   );
-}
+};
 
 export default function CVPage() {
   const [activeSection, setActiveSection] = useState<SectionName>("All");
-  const profile = useMemo(() => loadProfile(), []);
+  
+  const [initialProfile, setInitialProfile] = useState<any>({});
+  const [profile, setProfile] = useState<any>({});
+  
+  const [availableProfiles, setAvailableProfiles] = useState<any[]>([]);
+  const [activeProfileId, setActiveProfileId] = useState<string>("");
+  const [masterProfileId, setMasterProfileId] = useState<string>(""); // ✅ Added to track Master CV
 
-  const sections: SectionName[] = [
-    "All",
-    "Personal Info",
-    "Experience",
-    "Education",
-    "Skills",
-    "Certifications",
-    "Languages",
-    "Projects",
-    "Publications",
-    "Teaching",
-    "Research",
-    "Awards",
-    "Volunteer",
-    "Memberships",
-    "Social Links",
-  ];
+  const [isSaving, setIsSaving] = useState(false);
+  const [isCloning, setIsCloning] = useState(false); // ✅ Added Clone Loading State
+  const [isUploading, setIsUploading] = useState(false);
+  const [isSyncingLinkedIn, setIsSyncingLinkedIn] = useState(false);
+  const [linkedInUrl, setLinkedInUrl] = useState("");
 
-  const populatedSections = [
-    profile.personalStatement,
-    profile.aboutMe,
-    profile.socialLinks,
-    profile.skills,
-    profile.experience,
-    profile.education,
-    profile.certifications,
-    profile.languages,
-    profile.projects,
-    profile.publications,
-    profile.teachingExperience,
-    profile.researchExperience,
-    profile.awards,
-    profile.volunteer,
-    profile.memberships,
-  ].filter((item) => (Array.isArray(item) ? item.length > 0 : hasText(item)));
+  const sectionRefs: Record<string, any> = {
+    "Personal Info": useRef<HTMLDivElement>(null), "Experience": useRef<HTMLDivElement>(null),
+    "Education": useRef<HTMLDivElement>(null), "Skills": useRef<HTMLDivElement>(null),
+    "Certifications": useRef<HTMLDivElement>(null), "Languages": useRef<HTMLDivElement>(null),
+    "Projects": useRef<HTMLDivElement>(null), "Publications": useRef<HTMLDivElement>(null),
+    "Teaching": useRef<HTMLDivElement>(null), "Research": useRef<HTMLDivElement>(null),
+    "Awards": useRef<HTMLDivElement>(null), "Volunteer": useRef<HTMLDivElement>(null),
+    "Memberships": useRef<HTMLDivElement>(null), "Social Links": useRef<HTMLDivElement>(null)
+  };
 
-  const completion = Math.round((populatedSections.length / 15) * 100);
-  const showSection = (section: SectionName) =>
-    activeSection === "All" || activeSection === section;
+  const API_BASE = "http://localhost:5167/api/UserProfile";
+
+  const fetchCVData = async () => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const token = await user.getIdToken();
+      const res = await axios.get(`${API_BASE}/full-profile?userId=${user.uid}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.data) {
+        setActiveProfileId(res.data.activeProfileId || "");
+        setMasterProfileId(res.data.masterProfileId || "");
+        setAvailableProfiles(res.data.availableProfiles || []);
+        
+        const mappedData = {
+          fullName: res.data.fullName || user.displayName || "",
+          email: res.data.email || user.email || "",
+          phone: res.data.phone || "",
+          address: res.data.address || "",
+          gpa: res.data.gpa?.toString() || "",
+          employmentStatus: res.data.employmentStatus || "Unemployed",
+          ...res.data
+        };
+        setInitialProfile(JSON.parse(JSON.stringify(mappedData))); 
+        setProfile(JSON.parse(JSON.stringify(mappedData)));
+      }
+    } catch (err: any) { 
+      console.error("🔥 C# Server Error Details:", err.response?.data?.details || err.response?.data?.error || err.message); 
+    }
+  };
+
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged(user => { if (user) fetchCVData(); });
+    return () => unsub();
+  }, []);
+
+  // --- PROFILE MANAGEMENT ---
+  const handleProfileSwitch = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newProfileId = e.target.value;
+    setActiveProfileId(newProfileId);
+    try {
+      const user = auth.currentUser;
+      const token = await user?.getIdToken();
+      await axios.post(`${API_BASE}/switch-profile`, { userId: user?.uid, profileId: newProfileId }, { headers: { Authorization: `Bearer ${token}` } });
+      await fetchCVData();
+    } catch (err) { console.error(err); }
+  };
+
+  // ✅ NEW: CLONE FROM MASTER
+  const handleCloneProfile = async () => {
+    if(!masterProfileId || !activeProfileId) return;
+    setIsCloning(true);
+    try {
+        const token = await auth.currentUser?.getIdToken();
+        await axios.post(`${API_BASE}/clone-profile`, { MasterProfileId: masterProfileId, TargetProfileId: activeProfileId }, { headers: { Authorization: `Bearer ${token}` } });
+        await fetchCVData();
+    } catch (err) {
+        console.error("Clone Failed:", err);
+    } finally {
+        setIsCloning(false);
+    }
+  };
+
+  const handleFieldChange = (field: string, value: string) => setProfile((p: any) => ({ ...p, [field]: value }));
+  const handleArrayChange = (collectionKey: string, index: number, field: string, value: string) => {
+    setProfile((p: any) => {
+      const newArr = [...(p[collectionKey] || [])];
+      newArr[index] = { ...newArr[index], [field]: value };
+      return { ...p, [collectionKey]: newArr };
+    });
+  };
+  const addArrayItem = (collectionKey: string, defaultItem: any) => {
+    setProfile((p: any) => ({ ...p, [collectionKey]: [...(p[collectionKey] || []), { id: `temp-${Date.now()}-${Math.random()}`, ...defaultItem }] }));
+  };
+  const removeArrayItem = (collectionKey: string, index: number) => {
+    setProfile((p: any) => {
+      const newArr = [...(p[collectionKey] || [])];
+      newArr.splice(index, 1);
+      return { ...p, [collectionKey]: newArr };
+    });
+  };
+
+  // --- SAVE ACTIONS ---
+  const isPersonalInfoDirty = () => {
+    const fields = ["fullName", "phone", "address", "gpa", "portfolioUrl", "currentOrg", "currentPosition", "personalStatement", "aboutMe"];
+    return fields.some(f => profile[f] !== initialProfile[f]);
+  };
+
+  const savePersonalInfo = async () => {
+    setIsSaving(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const token = await user.getIdToken();
+      const fields = ["fullName", "phone", "address", "gpa", "portfolioUrl", "currentOrg", "currentPosition", "personalStatement", "aboutMe"];
+      const promises = [];
+      for (const f of fields) {
+        if (profile[f] !== initialProfile[f]) {
+          promises.push(axios.put(`${API_BASE}/profile-update`, { userId: user.uid, profileId: activeProfileId, field: f, value: profile[f] }, { headers: { Authorization: `Bearer ${token}` } }));
+        }
+      }
+      await Promise.all(promises);
+      await fetchCVData();
+    } catch (err) { console.error(err); } finally { setIsSaving(false); }
+  };
+
+  const isCollectionDirty = (collectionKey: string) => {
+    const orig = initialProfile[collectionKey] || [];
+    const curr = profile[collectionKey] || [];
+    return JSON.stringify(orig) !== JSON.stringify(curr);
+  };
+
+  const saveCollectionSection = async (tableName: string, collectionKey: string) => {
+    if (!activeProfileId) return;
+    setIsSaving(true);
+    const origItems = initialProfile[collectionKey] || [];
+    const currItems = profile[collectionKey] || [];
+    const toDeleteIds: string[] = [];
+    const toAdd: any[] = [];
+
+    for (const orig of origItems) {
+      const curr = currItems.find((i: any) => i.id === orig.id);
+      if (!curr) { toDeleteIds.push(orig.id); } 
+      else {
+        const { id: origId, ...origRest } = orig;
+        const { id: currId, ...currRest } = curr;
+        if (JSON.stringify(origRest) !== JSON.stringify(currRest)) {
+          toDeleteIds.push(orig.id); toAdd.push(curr); 
+        }
+      }
+    }
+    for (const curr of currItems) { if (String(curr.id).startsWith("temp-")) toAdd.push(curr); }
+
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      for (const id of toDeleteIds) { await axios.delete(`${API_BASE}/collection/${tableName}/${id}`, { headers: { Authorization: `Bearer ${token}` } }); }
+      for (const item of toAdd) {
+        const { id, profileId, profile_id, created_at, updated_at, ...rest } = item;
+        await axios.post(`${API_BASE}/collection/${tableName}`, { profileId: activeProfileId, ...toSnakeCase(rest) }, { headers: { Authorization: `Bearer ${token}` } });
+      }
+      await fetchCVData();
+    } catch (err: any) { 
+      console.error(err); 
+      if(err.response?.data) alert(err.response.data);
+    } finally { setIsSaving(false); }
+  };
+
+  // --- AUTOMATED SYNC ACTIONS ---
+  const handlePDFUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    const formData = new FormData(); formData.append("file", file);
+    try {
+      const user = auth.currentUser;
+      const token = await user?.getIdToken();
+      const uploadRes = await axios.post("http://localhost:5167/api/CV/upload-cloudinary", formData, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.post("http://localhost:8000/process-pdf", { userId: user?.uid, cvUrl: uploadRes.data.url });
+      await fetchCVData();
+    } catch (err) { console.error(err); } finally { setIsUploading(false); }
+  };
+
+  const handleLinkedInSync = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!linkedInUrl.trim()) return;
+    setIsSyncingLinkedIn(true);
+    try {
+      const user = auth.currentUser;
+      const formData = new FormData();
+      formData.append("user_id", user?.uid || "");
+      formData.append("profile_url", linkedInUrl);
+      await axios.post("http://localhost:8000/sync-linkedin", formData, { headers: { "Content-Type": "multipart/form-data" } });
+      await fetchCVData();
+      setLinkedInUrl("");
+    } catch (err) { console.error(err); } finally { setIsSyncingLinkedIn(false); }
+  };
+
+  const completionPercentage = useMemo(() => {
+    let filled = 0;
+    if (profile.phone || profile.address || profile.gpa || profile.fullName) filled++;
+    if (profile.portfolioUrl || profile.currentOrg || profile.currentPosition || profile.personalStatement || profile.aboutMe) filled++;
+    const arrs = [profile.skills, profile.experience, profile.education, profile.projects, profile.publications, profile.certifications, profile.memberships, profile.languages, profile.teachingExperience, profile.researchExperience, profile.awards, profile.volunteer];
+    arrs.forEach(a => { if (a && a.length > 0) filled++; });
+    return Math.round((filled / 14) * 100);
+  }, [profile]);
+
+  const showSection = (s: SectionName) => activeSection === "All" || activeSection === s;
+
+  // Determine if active profile is empty (to show Clone button)
+  // Determine if we are on a targeted role (to show Clone button)
+const canCloneFromMaster = activeProfileId !== masterProfileId;
 
   return (
-    <div className="p-6 sm:p-8 max-w-7xl">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-6 sm:p-8 max-w-7xl mx-auto">
+      
+      {/* HEADER WITH JOB ROLE TRACK SELECTOR */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-900">
-            My CV Profile
-          </h1>
-          <p className="text-slate-500 text-sm mt-0.5">
-            Filter the full CV schema and surface only the populated sections.
-          </p>
+          <h1 className="text-2xl font-extrabold text-slate-900">My CV Workspace</h1>
+          <p className="text-slate-500 text-sm mt-0.5">Edit your Master CV or select a targeted Job Role track to customize.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Link
-            href="/cv/preview"
-            className="flex items-center gap-1.5 border border-blue-200 text-blue-600 text-sm font-semibold px-3 py-2 rounded-xl hover:bg-blue-50 transition-colors"
+        
+        {/* ✅ CLUSTERED ROLE SELECTOR UI */}
+        <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 p-2 rounded-xl">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-2">Editing Track:</span>
+          <select 
+            value={activeProfileId} 
+            onChange={handleProfileSwitch} 
+            className="border-none bg-white py-1.5 px-3 rounded-lg text-sm font-bold text-blue-700 shadow-sm outline-none cursor-pointer min-w-[200px]"
           >
-            <Eye size={14} /> View CV
-          </Link>
-          <button
-            type="button"
-            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-3 py-2 rounded-xl transition-colors"
-          >
-            <Download size={14} /> Download PDF
-          </button>
-        </div>
-      </div>
-
-      <div className="bg-linear-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-5 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="relative w-14 h-14 shrink-0">
-            <svg viewBox="0 0 48 48" className="w-14 h-14 -rotate-90">
-              <circle
-                cx="24"
-                cy="24"
-                r="20"
-                fill="none"
-                stroke="#e2e8f0"
-                strokeWidth="4"
-              />
-              <circle
-                cx="24"
-                cy="24"
-                r="20"
-                fill="none"
-                stroke="#2563eb"
-                strokeWidth="4"
-                strokeDasharray={`${2 * Math.PI * 20 * (completion / 100)} ${2 * Math.PI * 20 * (1 - completion / 100)}`}
-                strokeLinecap="round"
-              />
-            </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-sm font-extrabold text-blue-600">
-              {completion}%
-            </span>
-          </div>
-          <div>
-            <p className="font-bold text-slate-900">
-              Your profile is now schema-aware.
-            </p>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Added filtering for personal info, experience, education, skills,
-              certifications, languages, projects, publications, teaching,
-              research, awards, volunteer work, and memberships.
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-3 shrink-0">
-          <Link
-            href="/cv/complete"
-            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
-          >
-            <Plus size={14} /> Complete Profile
-          </Link>
-          <Link
-            href="/cv/preview"
-            className="flex items-center gap-1.5 border border-blue-200 text-blue-600 text-sm font-semibold px-4 py-2 rounded-xl hover:bg-blue-50 transition-colors"
-          >
-            <Eye size={14} /> Preview Public View
-          </Link>
+            <optgroup label="Master Profile">
+                {availableProfiles.filter(p => p.isMaster).map(p => (
+                    <option key={p.id} value={p.id}>👑 {p.jobRole}</option>
+                ))}
+            </optgroup>
+            <optgroup label="Targeted Roles">
+                {availableProfiles.filter(p => !p.isMaster).map(p => (
+                    <option key={p.id} value={p.id}>{p.jobRole}</option>
+                ))}
+            </optgroup>
+          </select>
         </div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
+
+          {/* ✅ CLONE FROM MASTER BANNER */}
+          {canCloneFromMaster && (
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 flex items-center justify-between gap-4 shadow-sm">
+                <div>
+                    <h3 className="font-bold text-blue-800 text-sm flex items-center gap-1.5"><Copy size={16}/> Sync from Master CV</h3>
+                    <p className="text-xs text-blue-600 mt-1">Pull missing data from your General Profile. This safely merges data without overwriting your existing entries.</p>
+                </div>
+                <button onClick={handleCloneProfile} disabled={isCloning} className="shrink-0 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-colors flex items-center gap-2">
+                    {isCloning ? <Loader2 className="animate-spin" size={14}/> : <Plus size={14}/>} Clone Missing Data
+                </button>
+            </div>
+          )}
+
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+            
             <div className="flex gap-2 mb-6 flex-wrap">
-              {sections.map((section) => (
-                <button
-                  key={section}
-                  onClick={() => setActiveSection(section)}
-                  className={`px-4 py-2 text-sm font-semibold rounded-xl border transition-colors ${sectionButtonClass(activeSection === section)}`}
-                >
+              {(["All", "Personal Info", "Experience", "Education", "Skills", "Certifications", "Languages", "Projects", "Publications", "Teaching", "Research", "Awards", "Volunteer", "Memberships", "Social Links"] as SectionName[]).map(section => (
+                <button key={section} onClick={() => setActiveSection(section)} className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition-colors ${activeSection === section ? "bg-blue-600 text-white border-blue-600" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}>
                   {section}
                 </button>
               ))}
             </div>
 
+            {/* 1. PERSONAL INFO */}
             {showSection("Personal Info") && (
-              <SectionCard icon={<Briefcase size={18} />} title="Personal Info">
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <InfoPill label="Full name" value={profile.fullName} />
-                  <InfoPill label="Role" value={profile.jobrole} />
-                  <InfoPill label="Email" value={profile.email} />
-                  <InfoPill label="Phone" value={profile.phone} />
-                  <InfoPill label="Address" value={profile.address} />
-                  <InfoPill
-                    label="Employment status"
-                    value={profile.employmentStatus}
-                  />
-                  <InfoPill label="Current org" value={profile.currentOrg} />
-                  <InfoPill
-                    label="Current position"
-                    value={profile.currentPosition}
-                  />
-                  <InfoPill label="Portfolio" value={profile.portfolioUrl} />
-                  <InfoPill label="GPA" value={profile.gpa} />
+              <div ref={sectionRefs["Personal Info"]} className="mb-8 p-5 bg-slate-50/50 border border-slate-100 rounded-2xl space-y-4">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-100"><Briefcase className="text-blue-600" size={18}/><h3 className="font-bold text-sm text-slate-800">Personal Info</h3></div>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div><label className="text-xs font-medium text-slate-500 block mb-1">Full Name</label><input type="text" value={profile.fullName || ""} onChange={e => handleFieldChange("fullName", e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-sm outline-none font-semibold focus:border-blue-500"/></div>
+                  <div><label className="text-xs font-medium text-slate-500 block mb-1">Email (Read Only)</label><input type="text" value={profile.email || ""} readOnly className="w-full bg-slate-100 border border-slate-200 rounded-xl p-2.5 text-sm font-semibold text-slate-400 outline-none cursor-not-allowed"/></div>
+                  <div><label className="text-xs font-medium text-slate-500 block mb-1">Phone</label><input type="text" value={profile.phone || ""} onChange={e => handleFieldChange("phone", e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-sm outline-none font-semibold focus:border-blue-500"/></div>
+                  <div><label className="text-xs font-medium text-slate-500 block mb-1">Address</label><input type="text" value={profile.address || ""} onChange={e => handleFieldChange("address", e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-sm outline-none font-semibold focus:border-blue-500"/></div>
+                  <div><label className="text-xs font-medium text-slate-500 block mb-1">Portfolio Link</label><input type="text" value={profile.portfolioUrl || ""} onChange={e => handleFieldChange("portfolioUrl", e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-sm outline-none font-semibold focus:border-blue-500"/></div>
+                  <div><label className="text-xs font-medium text-slate-500 block mb-1">GPA</label><input type="text" value={profile.gpa || ""} onChange={e => handleFieldChange("gpa", e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-sm outline-none font-semibold focus:border-blue-500"/></div>
+                  <div><label className="text-xs font-medium text-slate-500 block mb-1">Current Organization</label><input type="text" value={profile.currentOrg || ""} onChange={e => handleFieldChange("currentOrg", e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-sm outline-none font-semibold focus:border-blue-500"/></div>
+                  <div><label className="text-xs font-medium text-slate-500 block mb-1">Current Position</label><input type="text" value={profile.currentPosition || ""} onChange={e => handleFieldChange("currentPosition", e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-sm outline-none font-semibold focus:border-blue-500"/></div>
                 </div>
-                {hasText(profile.personalStatement) && (
-                  <div className="mt-4 rounded-xl bg-slate-50 border border-slate-200 p-4">
-                    <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">
-                      Personal Statement
-                    </p>
-                    <p className="text-sm text-slate-700 leading-relaxed">
-                      {profile.personalStatement}
-                    </p>
-                  </div>
-                )}
-                {hasText(profile.aboutMe) && (
-                  <div className="mt-4 rounded-xl bg-slate-50 border border-slate-200 p-4">
-                    <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">
-                      About Me
-                    </p>
-                    <p className="text-sm text-slate-700 leading-relaxed">
-                      {profile.aboutMe}
-                    </p>
-                  </div>
-                )}
-              </SectionCard>
+                <div><label className="text-xs font-medium text-slate-500 block mb-1">Personal Statement</label><textarea value={profile.personalStatement || ""} onChange={e => handleFieldChange("personalStatement", e.target.value)} rows={2} className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-sm outline-none font-semibold focus:border-blue-500 resize-none"/></div>
+                <div><label className="text-xs font-medium text-slate-500 block mb-1">About Me</label><textarea value={profile.aboutMe || ""} onChange={e => handleFieldChange("aboutMe", e.target.value)} rows={2} className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-sm outline-none font-semibold focus:border-blue-500 resize-none"/></div>
+                
+                <SaveControls isDirty={isPersonalInfoDirty()} isSaving={isSaving} onSave={savePersonalInfo} onDiscard={() => setProfile((p:any) => ({...p, ...JSON.parse(JSON.stringify(initialProfile))}))} />
+              </div>
             )}
 
-            {showSection("Social Links") && profile.socialLinks.length > 0 && (
-              <SectionCard icon={<Link2 size={18} />} title="Social Links">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {profile.socialLinks
-                    .filter(
-                      (item) =>
-                        hasText(item.platformName) || hasText(item.profileUrl),
-                    )
-                    .map((item) => (
-                      <div
-                        key={`${item.platformName}-${item.profileUrl}`}
-                        className="rounded-xl border border-slate-200 p-4"
-                      >
-                        <p className="text-sm font-semibold text-slate-900">
-                          {item.platformName}
-                        </p>
-                        <p className="text-xs text-slate-500 break-all mt-1">
-                          {item.profileUrl}
-                        </p>
-                      </div>
-                    ))}
+            {/* 2. SKILLS */}
+            {showSection("Skills") && (
+              <div ref={sectionRefs["Skills"]} className="mb-8 p-5 bg-slate-50/50 border border-slate-100 rounded-2xl">
+                <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2"><Globe className="text-blue-600" size={18}/><h4 className="font-bold text-sm text-slate-800">Skills</h4></div>
+                  <button onClick={() => addArrayItem("skills", { skillName: "", level: "Beginner" })} className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"><Plus size={14}/> Add Skill</button>
                 </div>
-              </SectionCard>
-            )}
-
-            {showSection("Experience") && profile.experience.length > 0 && (
-              <SectionCard icon={<Briefcase size={18} />} title="Experience">
-                <div className="space-y-5">
-                  {profile.experience.map((item) => (
-                    <div
-                      key={`${item.roleTitle}-${item.companyName}-${item.startDate}`}
-                      className="border-l-2 border-blue-200 pl-4"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <h4 className="font-semibold text-slate-900 text-sm">
-                            {item.roleTitle}
-                          </h4>
-                          <p className="text-xs text-blue-600 font-medium">
-                            {item.companyName}
-                          </p>
-                        </div>
-                        <span className="text-xs text-slate-400 whitespace-nowrap">
-                          {[item.startDate, item.endDate]
-                            .filter(hasText)
-                            .join(" - ")}
-                        </span>
-                      </div>
-                      {hasText(item.roleDescription) && (
-                        <p className="mt-2 text-xs text-slate-500 leading-relaxed">
-                          {item.roleDescription}
-                        </p>
-                      )}
+                <div className="space-y-3">
+                  {profile.skills?.length === 0 && <p className="text-xs text-slate-400 italic">No items added. Click '+ Add Skill' to create one.</p>}
+                  {profile.skills?.map((s: any, idx: number) => (
+                    <div key={s.id} className="flex gap-2 items-center bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
+                      <input type="text" placeholder="Skill Name" value={s.skillName || ""} onChange={e => handleArrayChange("skills", idx, "skillName", e.target.value)} className="border-0 px-2 py-1 text-sm flex-1 outline-none font-semibold focus:text-blue-600"/>
+                      <select value={s.level || "Beginner"} onChange={e => handleArrayChange("skills", idx, "level", e.target.value)} className="border-l border-slate-200 pl-2 py-1 text-sm outline-none bg-transparent text-slate-600">
+                        <option>Beginner</option><option>Intermediate</option><option>Expert</option>
+                      </select>
+                      <button onClick={() => removeArrayItem("skills", idx)} className="text-slate-400 hover:text-red-500 px-2 border-l border-slate-200"><Trash2 size={16}/></button>
                     </div>
                   ))}
                 </div>
-              </SectionCard>
+                <SaveControls isDirty={isCollectionDirty("skills")} isSaving={isSaving} onSave={() => saveCollectionSection("skill", "skills")} onDiscard={() => setProfile((p:any) => ({...p, skills: JSON.parse(JSON.stringify(initialProfile.skills || []))}))} />
+              </div>
             )}
 
-            {showSection("Education") && profile.education.length > 0 && (
-              <SectionCard icon={<GraduationCap size={18} />} title="Education">
+            {/* 3. EXPERIENCE */}
+            {showSection("Experience") && (
+              <div ref={sectionRefs["Experience"]} className="mb-8 p-5 bg-slate-50/50 border border-slate-100 rounded-2xl">
+                <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2"><Briefcase className="text-blue-600" size={18}/><h4 className="font-bold text-sm text-slate-800">Experience</h4></div>
+                  <button onClick={() => addArrayItem("experience", { companyName: "", roleDescription: "", startDate: "", endDate: "" })} className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"><Plus size={14}/> Add Experience</button>
+                </div>
                 <div className="space-y-4">
-                  {profile.education.map((item) => (
-                    <div
-                      key={`${item.degreeTitle}-${item.organization}-${item.endDate}`}
-                      className="rounded-xl border border-slate-200 p-4"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">
-                            {item.degreeTitle}
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            {item.organization}
-                          </p>
-                        </div>
-                        <span className="text-xs text-slate-400 whitespace-nowrap">
-                          {[item.startDate, item.endDate]
-                            .filter(hasText)
-                            .join(" - ")}
-                        </span>
-                      </div>
-                      <div className="mt-3 grid sm:grid-cols-2 gap-2 text-xs text-slate-500">
-                        <InfoPill label="Field" value={item.fieldOfStudy} />
-                        <InfoPill label="Honors" value={item.honors} />
-                        <InfoPill label="Thesis" value={item.thesisTitle} />
-                        <InfoPill
-                          label="Coursework"
-                          value={item.relevantCoursework}
-                        />
+                  {profile.experience?.length === 0 && <p className="text-xs text-slate-400 italic">No items added. Click '+ Add Experience' to create one.</p>}
+                  {profile.experience?.map((exp: any, idx: number) => (
+                    <div key={exp.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative group">
+                      <button onClick={() => removeArrayItem("experience", idx)} className="absolute top-4 right-4 text-slate-300 hover:text-red-500"><Trash2 size={16}/></button>
+                      <div className="grid grid-cols-2 gap-3 pr-8">
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">Company Name</label><input type="text" placeholder="e.g. Google" value={exp.companyName || ""} onChange={e => handleArrayChange("experience", idx, "companyName", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none font-semibold focus:border-blue-500"/></div>
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">Role / Title</label><input type="text" placeholder="e.g. Engineer" value={exp.roleDescription || ""} onChange={e => handleArrayChange("experience", idx, "roleDescription", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none font-semibold focus:border-blue-500"/></div>
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">Start Date</label><input type="date" value={exp.startDate || ""} onChange={e => handleArrayChange("experience", idx, "startDate", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none text-slate-600 focus:border-blue-500"/></div>
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">End Date</label><input type="date" value={exp.endDate || ""} onChange={e => handleArrayChange("experience", idx, "endDate", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none text-slate-600 focus:border-blue-500"/></div>
                       </div>
                     </div>
                   ))}
                 </div>
-              </SectionCard>
+                <SaveControls isDirty={isCollectionDirty("experience")} isSaving={isSaving} onSave={() => saveCollectionSection("experience", "experience")} onDiscard={() => setProfile((p:any) => ({...p, experience: JSON.parse(JSON.stringify(initialProfile.experience || []))}))} />
+              </div>
             )}
 
-            {showSection("Skills") && profile.skills.length > 0 && (
-              <SectionCard icon={<Globe size={18} />} title="Skills">
-                <div className="flex flex-wrap gap-2">
-                  {profile.skills.map((item) => (
-                    <span
-                      key={`${item.skillName}-${item.level}`}
-                      className="bg-blue-50 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-full border border-blue-100"
-                    >
-                      {item.skillName}
-                      {hasText(item.level) ? ` · ${item.level}` : ""}
-                    </span>
-                  ))}
+            {/* 4. EDUCATION */}
+            {showSection("Education") && (
+              <div ref={sectionRefs["Education"]} className="mb-8 p-5 bg-slate-50/50 border border-slate-100 rounded-2xl">
+                <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2"><GraduationCap className="text-blue-600" size={18}/><h4 className="font-bold text-sm text-slate-800">Education</h4></div>
+                  <button onClick={() => addArrayItem("education", { degreeTitle: "", fieldOfStudy: "", organization: "", startDate: "", endDate: "", honors: "", thesisTitle: "" })} className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"><Plus size={14}/> Add Education</button>
                 </div>
-              </SectionCard>
-            )}
-
-            {showSection("Certifications") &&
-              profile.certifications.length > 0 && (
-                <SectionCard icon={<Award size={18} />} title="Certifications">
-                  <div className="space-y-3">
-                    {profile.certifications.map((item) => (
-                      <div
-                        key={`${item.organization}-${item.field}-${item.issueDate}`}
-                        className="rounded-xl border border-slate-200 p-4"
-                      >
-                        <p className="text-sm font-semibold text-slate-900">
-                          {item.field}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {item.organization}
-                        </p>
-                        <p className="text-[11px] uppercase tracking-wide text-slate-400 mt-2">
-                          Issued {item.issueDate}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </SectionCard>
-              )}
-
-            {showSection("Languages") && profile.languages.length > 0 && (
-              <SectionCard icon={<Languages size={18} />} title="Languages">
-                <div className="flex flex-wrap gap-2">
-                  {profile.languages.map((item) => (
-                    <span
-                      key={`${item.languageName}-${item.proficiency}`}
-                      className="bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200"
-                    >
-                      {item.languageName}
-                      {hasText(item.proficiency)
-                        ? ` · ${item.proficiency}`
-                        : ""}
-                    </span>
-                  ))}
-                </div>
-              </SectionCard>
-            )}
-
-            {showSection("Projects") && profile.projects.length > 0 && (
-              <SectionCard icon={<FileText size={18} />} title="Projects">
                 <div className="space-y-4">
-                  {profile.projects.map((item) => (
-                    <div
-                      key={`${item.name}-${item.timePeriod}`}
-                      className="rounded-xl border border-slate-200 p-4"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">
-                            {item.name}
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            {item.organization}
-                          </p>
-                        </div>
-                        <span className="text-xs text-slate-400 whitespace-nowrap">
-                          {item.timePeriod}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-xs text-slate-500 leading-relaxed">
-                        {item.description}
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-400">
-                        <span className="rounded-full border border-slate-200 px-2 py-1">
-                          {item.role}
-                        </span>
-                        {hasText(item.sourceLink) && (
-                          <span className="rounded-full border border-slate-200 px-2 py-1 break-all">
-                            {item.sourceLink}
-                          </span>
-                        )}
+                  {profile.education?.length === 0 && <p className="text-xs text-slate-400 italic">No items added. Click '+ Add Education' to create one.</p>}
+                  {profile.education?.map((edu: any, idx: number) => (
+                    <div key={edu.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative">
+                      <button onClick={() => removeArrayItem("education", idx)} className="absolute top-4 right-4 text-slate-300 hover:text-red-500"><Trash2 size={16}/></button>
+                      <div className="grid grid-cols-2 gap-3 pr-8">
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">Degree Title</label><input type="text" value={edu.degreeTitle || ""} onChange={e => handleArrayChange("education", idx, "degreeTitle", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none font-semibold focus:border-blue-500"/></div>
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">University / Org</label><input type="text" value={edu.organization || ""} onChange={e => handleArrayChange("education", idx, "organization", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none font-semibold focus:border-blue-500"/></div>
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">Field of Study</label><input type="text" value={edu.fieldOfStudy || ""} onChange={e => handleArrayChange("education", idx, "fieldOfStudy", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none font-semibold focus:border-blue-500"/></div>
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">Honors</label><input type="text" value={edu.honors || ""} onChange={e => handleArrayChange("education", idx, "honors", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none font-semibold focus:border-blue-500"/></div>
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">Start Date</label><input type="date" value={edu.startDate || ""} onChange={e => handleArrayChange("education", idx, "startDate", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none text-slate-600 focus:border-blue-500"/></div>
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">End Date</label><input type="date" value={edu.endDate || ""} onChange={e => handleArrayChange("education", idx, "endDate", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none text-slate-600 focus:border-blue-500"/></div>
+                        <div className="col-span-2"><label className="text-[10px] uppercase font-bold text-slate-400">Thesis Title</label><input type="text" value={edu.thesisTitle || ""} onChange={e => handleArrayChange("education", idx, "thesisTitle", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none font-semibold focus:border-blue-500"/></div>
                       </div>
                     </div>
                   ))}
                 </div>
-              </SectionCard>
+                <SaveControls isDirty={isCollectionDirty("education")} isSaving={isSaving} onSave={() => saveCollectionSection("education", "education")} onDiscard={() => setProfile((p:any) => ({...p, education: JSON.parse(JSON.stringify(initialProfile.education || []))}))} />
+              </div>
             )}
 
-            {showSection("Publications") && profile.publications.length > 0 && (
-              <SectionCard icon={<BookOpen size={18} />} title="Publications">
+            {/* 5. PROJECTS */}
+            {showSection("Projects") && (
+              <div ref={sectionRefs["Projects"]} className="mb-8 p-5 bg-slate-50/50 border border-slate-100 rounded-2xl">
+                <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2"><FileText className="text-blue-600" size={18}/><h4 className="font-bold text-sm text-slate-800">Projects</h4></div>
+                  <button onClick={() => addArrayItem("projects", { name: "", role: "", organization: "", timePeriod: "", sourceLink: "", description: "" })} className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"><Plus size={14}/> Add Project</button>
+                </div>
+                <div className="space-y-4">
+                  {profile.projects?.length === 0 && <p className="text-xs text-slate-400 italic">No items added. Click '+ Add Project' to create one.</p>}
+                  {profile.projects?.map((proj: any, idx: number) => (
+                    <div key={proj.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative">
+                      <button onClick={() => removeArrayItem("projects", idx)} className="absolute top-4 right-4 text-slate-300 hover:text-red-500"><Trash2 size={16}/></button>
+                      <div className="grid grid-cols-2 gap-3 pr-8">
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">Project Name</label><input type="text" value={proj.name || ""} onChange={e => handleArrayChange("projects", idx, "name", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none font-semibold focus:border-blue-500"/></div>
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">Role</label><input type="text" value={proj.role || ""} onChange={e => handleArrayChange("projects", idx, "role", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none font-semibold focus:border-blue-500"/></div>
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">Organization</label><input type="text" value={proj.organization || ""} onChange={e => handleArrayChange("projects", idx, "organization", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none font-semibold focus:border-blue-500"/></div>
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">Time Period</label><input type="text" value={proj.timePeriod || ""} onChange={e => handleArrayChange("projects", idx, "timePeriod", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none font-semibold focus:border-blue-500"/></div>
+                        <div className="col-span-2"><label className="text-[10px] uppercase font-bold text-slate-400">Source Link</label><input type="url" value={proj.sourceLink || ""} onChange={e => handleArrayChange("projects", idx, "sourceLink", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none text-blue-600 focus:border-blue-500"/></div>
+                        <div className="col-span-2"><label className="text-[10px] uppercase font-bold text-slate-400">Description</label><textarea value={proj.description || ""} onChange={e => handleArrayChange("projects", idx, "description", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none resize-none focus:border-blue-500" rows={2}/></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <SaveControls isDirty={isCollectionDirty("projects")} isSaving={isSaving} onSave={() => saveCollectionSection("project", "projects")} onDiscard={() => setProfile((p:any) => ({...p, projects: JSON.parse(JSON.stringify(initialProfile.projects || []))}))} />
+              </div>
+            )}
+
+            {/* 6. CERTIFICATIONS */}
+            {showSection("Certifications") && (
+              <div ref={sectionRefs["Certifications"]} className="mb-8 p-5 bg-slate-50/50 border border-slate-100 rounded-2xl">
+                <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2"><Award className="text-blue-600" size={18}/><h4 className="font-bold text-sm text-slate-800">Certifications</h4></div>
+                  <button onClick={() => addArrayItem("certifications", { field: "", organization: "", issueDate: "" })} className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"><Plus size={14}/> Add Cert</button>
+                </div>
                 <div className="space-y-3">
-                  {profile.publications.map((item) => (
-                    <div
-                      key={`${item.title}-${item.year}`}
-                      className="rounded-xl border border-slate-200 p-4"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">
-                            {item.title}
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            {item.organization}
-                          </p>
-                        </div>
-                        <span className="text-xs text-slate-400 whitespace-nowrap">
-                          {item.year}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-xs text-slate-500 leading-relaxed">
-                        {item.description}
-                      </p>
-                      {hasText(item.sourceLink) && (
-                        <p className="mt-2 text-[11px] text-slate-400 break-all">
-                          {item.sourceLink}
-                        </p>
-                      )}
+                  {profile.certifications?.length === 0 && <p className="text-xs text-slate-400 italic">No items added.</p>}
+                  {profile.certifications?.map((cert: any, idx: number) => (
+                    <div key={cert.id} className="flex gap-2 items-center bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
+                      <input type="text" placeholder="Field/Title" value={cert.field || ""} onChange={e => handleArrayChange("certifications", idx, "field", e.target.value)} className="border-0 px-2 py-1 text-sm flex-1 outline-none font-semibold focus:text-blue-600"/>
+                      <input type="text" placeholder="Organization" value={cert.organization || ""} onChange={e => handleArrayChange("certifications", idx, "organization", e.target.value)} className="border-l border-slate-200 px-2 py-1 text-sm flex-1 outline-none"/>
+                      <input type="date" value={cert.issueDate || ""} onChange={e => handleArrayChange("certifications", idx, "issueDate", e.target.value)} className="border-l border-slate-200 px-2 py-1 text-sm outline-none text-slate-600"/>
+                      <button onClick={() => removeArrayItem("certifications", idx)} className="text-slate-400 hover:text-red-500 px-2 border-l border-slate-200"><Trash2 size={16}/></button>
                     </div>
                   ))}
                 </div>
-              </SectionCard>
+                <SaveControls isDirty={isCollectionDirty("certifications")} isSaving={isSaving} onSave={() => saveCollectionSection("certification", "certifications")} onDiscard={() => setProfile((p:any) => ({...p, certifications: JSON.parse(JSON.stringify(initialProfile.certifications || []))}))} />
+              </div>
             )}
 
-            {showSection("Teaching") &&
-              profile.teachingExperience.length > 0 && (
-                <SectionCard
-                  icon={<Users size={18} />}
-                  title="Teaching Experience"
-                >
-                  <div className="space-y-3">
-                    {profile.teachingExperience.map((item) => (
-                      <div
-                        key={`${item.coursesTaught}-${item.organization}`}
-                        className="rounded-xl border border-slate-200 p-4"
-                      >
-                        <p className="text-sm font-semibold text-slate-900">
-                          {item.coursesTaught}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {item.organization} · {item.timePeriod}
-                        </p>
-                        <p className="mt-2 text-xs text-slate-500 leading-relaxed">
-                          {item.curriculumDescription}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </SectionCard>
-              )}
-
-            {showSection("Research") &&
-              profile.researchExperience.length > 0 && (
-                <SectionCard
-                  icon={<BookOpen size={18} />}
-                  title="Research Experience"
-                >
-                  <div className="space-y-3">
-                    {profile.researchExperience.map((item) => (
-                      <div
-                        key={`${item.projectName}-${item.organization}`}
-                        className="rounded-xl border border-slate-200 p-4"
-                      >
-                        <p className="text-sm font-semibold text-slate-900">
-                          {item.projectName}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {item.organization}
-                        </p>
-                        <p className="mt-2 text-xs text-slate-500 leading-relaxed">
-                          {item.resultsDescription}
-                        </p>
-                        <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-400">
-                          {hasText(item.labOrFieldWork) && (
-                            <span className="rounded-full border border-slate-200 px-2 py-1">
-                              {item.labOrFieldWork}
-                            </span>
-                          )}
-                          {hasText(item.linkedPublication) && (
-                            <span className="rounded-full border border-slate-200 px-2 py-1 break-all">
-                              {item.linkedPublication}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </SectionCard>
-              )}
-
-            {showSection("Awards") && profile.awards.length > 0 && (
-              <SectionCard icon={<Award size={18} />} title="Awards">
+            {/* 7. LANGUAGES */}
+            {showSection("Languages") && (
+              <div ref={sectionRefs["Languages"]} className="mb-8 p-5 bg-slate-50/50 border border-slate-100 rounded-2xl">
+                <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2"><Languages className="text-blue-600" size={18}/><h4 className="font-bold text-sm text-slate-800">Languages</h4></div>
+                  <button onClick={() => addArrayItem("languages", { languageName: "", proficiency: "Beginner" })} className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"><Plus size={14}/> Add Language</button>
+                </div>
                 <div className="space-y-3">
-                  {profile.awards.map((item) => (
-                    <div
-                      key={`${item.awardName}-${item.organization}`}
-                      className="rounded-xl border border-slate-200 p-4"
-                    >
-                      <p className="text-sm font-semibold text-slate-900">
-                        {item.awardName}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {item.organization}
-                      </p>
-                      <p className="mt-2 text-xs text-slate-500 leading-relaxed">
-                        {item.description}
-                      </p>
+                  {profile.languages?.length === 0 && <p className="text-xs text-slate-400 italic">No items added.</p>}
+                  {profile.languages?.map((lang: any, idx: number) => (
+                    <div key={lang.id} className="flex gap-2 items-center bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
+                      <input type="text" placeholder="Language" value={lang.languageName || ""} onChange={e => handleArrayChange("languages", idx, "languageName", e.target.value)} className="border-0 px-2 py-1 text-sm flex-1 outline-none font-semibold focus:text-blue-600"/>
+                      <select value={lang.proficiency || "Beginner"} onChange={e => handleArrayChange("languages", idx, "proficiency", e.target.value)} className="border-l border-slate-200 pl-2 py-1 text-sm outline-none bg-transparent text-slate-600">
+                        <option>Beginner</option><option>Intermediate</option><option>Expert</option><option>Native</option>
+                      </select>
+                      <button onClick={() => removeArrayItem("languages", idx)} className="text-slate-400 hover:text-red-500 px-2 border-l border-slate-200"><Trash2 size={16}/></button>
                     </div>
                   ))}
                 </div>
-              </SectionCard>
+                <SaveControls isDirty={isCollectionDirty("languages")} isSaving={isSaving} onSave={() => saveCollectionSection("language", "languages")} onDiscard={() => setProfile((p:any) => ({...p, languages: JSON.parse(JSON.stringify(initialProfile.languages || []))}))} />
+              </div>
             )}
 
-            {showSection("Volunteer") && profile.volunteer.length > 0 && (
-              <SectionCard icon={<Users size={18} />} title="Volunteer Work">
+            {/* 8. PUBLICATIONS */}
+            {showSection("Publications") && (
+              <div ref={sectionRefs["Publications"]} className="mb-8 p-5 bg-slate-50/50 border border-slate-100 rounded-2xl">
+                <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2"><BookOpen className="text-blue-600" size={18}/><h4 className="font-bold text-sm text-slate-800">Publications</h4></div>
+                  <button onClick={() => addArrayItem("publications", { title: "", organization: "", year: "", sourceLink: "", description: "" })} className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"><Plus size={14}/> Add Publication</button>
+                </div>
+                <div className="space-y-4">
+                  {profile.publications?.length === 0 && <p className="text-xs text-slate-400 italic">No items added.</p>}
+                  {profile.publications?.map((pub: any, idx: number) => (
+                    <div key={pub.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative">
+                      <button onClick={() => removeArrayItem("publications", idx)} className="absolute top-4 right-4 text-slate-300 hover:text-red-500"><Trash2 size={16}/></button>
+                      <div className="grid grid-cols-2 gap-3 pr-8">
+                        <div className="col-span-2"><label className="text-[10px] uppercase font-bold text-slate-400">Title</label><input type="text" value={pub.title || ""} onChange={e => handleArrayChange("publications", idx, "title", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none font-semibold focus:border-blue-500"/></div>
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">Organization / Publisher</label><input type="text" value={pub.organization || ""} onChange={e => handleArrayChange("publications", idx, "organization", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none focus:border-blue-500"/></div>
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">Year</label><input type="number" value={pub.year || ""} onChange={e => handleArrayChange("publications", idx, "year", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none focus:border-blue-500"/></div>
+                        <div className="col-span-2"><label className="text-[10px] uppercase font-bold text-slate-400">Link</label><input type="url" value={pub.sourceLink || ""} onChange={e => handleArrayChange("publications", idx, "sourceLink", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none text-blue-600 focus:border-blue-500"/></div>
+                        <div className="col-span-2"><label className="text-[10px] uppercase font-bold text-slate-400">Description</label><textarea value={pub.description || ""} onChange={e => handleArrayChange("publications", idx, "description", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none resize-none focus:border-blue-500" rows={2}/></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <SaveControls isDirty={isCollectionDirty("publications")} isSaving={isSaving} onSave={() => saveCollectionSection("publication", "publications")} onDiscard={() => setProfile((p:any) => ({...p, publications: JSON.parse(JSON.stringify(initialProfile.publications || []))}))} />
+              </div>
+            )}
+
+            {/* 9. TEACHING */}
+            {showSection("Teaching") && (
+              <div ref={sectionRefs["Teaching"]} className="mb-8 p-5 bg-slate-50/50 border border-slate-100 rounded-2xl">
+                <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2"><Users className="text-blue-600" size={18}/><h4 className="font-bold text-sm text-slate-800">Teaching Experience</h4></div>
+                  <button onClick={() => addArrayItem("teachingExperience", { coursesTaught: "", organization: "", timePeriod: "", curriculumDescription: "" })} className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"><Plus size={14}/> Add Teaching</button>
+                </div>
+                <div className="space-y-4">
+                  {profile.teachingExperience?.length === 0 && <p className="text-xs text-slate-400 italic">No items added.</p>}
+                  {profile.teachingExperience?.map((teach: any, idx: number) => (
+                    <div key={teach.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative">
+                      <button onClick={() => removeArrayItem("teachingExperience", idx)} className="absolute top-4 right-4 text-slate-300 hover:text-red-500"><Trash2 size={16}/></button>
+                      <div className="grid grid-cols-2 gap-3 pr-8">
+                        <div className="col-span-2"><label className="text-[10px] uppercase font-bold text-slate-400">Courses Taught</label><input type="text" value={teach.coursesTaught || ""} onChange={e => handleArrayChange("teachingExperience", idx, "coursesTaught", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none font-semibold focus:border-blue-500"/></div>
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">Organization</label><input type="text" value={teach.organization || ""} onChange={e => handleArrayChange("teachingExperience", idx, "organization", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none focus:border-blue-500"/></div>
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">Time Period</label><input type="text" value={teach.timePeriod || ""} onChange={e => handleArrayChange("teachingExperience", idx, "timePeriod", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none focus:border-blue-500"/></div>
+                        <div className="col-span-2"><label className="text-[10px] uppercase font-bold text-slate-400">Curriculum Description</label><textarea value={teach.curriculumDescription || ""} onChange={e => handleArrayChange("teachingExperience", idx, "curriculumDescription", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none resize-none focus:border-blue-500" rows={2}/></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <SaveControls isDirty={isCollectionDirty("teachingExperience")} isSaving={isSaving} onSave={() => saveCollectionSection("teaching_experience", "teachingExperience")} onDiscard={() => setProfile((p:any) => ({...p, teachingExperience: JSON.parse(JSON.stringify(initialProfile.teachingExperience || []))}))} />
+              </div>
+            )}
+
+            {/* 10. RESEARCH */}
+            {showSection("Research") && (
+              <div ref={sectionRefs["Research"]} className="mb-8 p-5 bg-slate-50/50 border border-slate-100 rounded-2xl">
+                <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2"><BookOpen className="text-blue-600" size={18}/><h4 className="font-bold text-sm text-slate-800">Research Experience</h4></div>
+                  <button onClick={() => addArrayItem("researchExperience", { projectName: "", organization: "", labOrFieldWork: "", resultsDescription: "" })} className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"><Plus size={14}/> Add Research</button>
+                </div>
+                <div className="space-y-4">
+                  {profile.researchExperience?.length === 0 && <p className="text-xs text-slate-400 italic">No items added.</p>}
+                  {profile.researchExperience?.map((res: any, idx: number) => (
+                    <div key={res.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative">
+                      <button onClick={() => removeArrayItem("researchExperience", idx)} className="absolute top-4 right-4 text-slate-300 hover:text-red-500"><Trash2 size={16}/></button>
+                      <div className="grid grid-cols-2 gap-3 pr-8">
+                        <div className="col-span-2"><label className="text-[10px] uppercase font-bold text-slate-400">Project Name</label><input type="text" value={res.projectName || ""} onChange={e => handleArrayChange("researchExperience", idx, "projectName", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none font-semibold focus:border-blue-500"/></div>
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">Organization</label><input type="text" value={res.organization || ""} onChange={e => handleArrayChange("researchExperience", idx, "organization", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none focus:border-blue-500"/></div>
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">Lab/Field Work</label><input type="text" value={res.labOrFieldWork || ""} onChange={e => handleArrayChange("researchExperience", idx, "labOrFieldWork", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none focus:border-blue-500"/></div>
+                        <div className="col-span-2"><label className="text-[10px] uppercase font-bold text-slate-400">Results Description</label><textarea value={res.resultsDescription || ""} onChange={e => handleArrayChange("researchExperience", idx, "resultsDescription", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none resize-none focus:border-blue-500" rows={2}/></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <SaveControls isDirty={isCollectionDirty("researchExperience")} isSaving={isSaving} onSave={() => saveCollectionSection("research_experience", "researchExperience")} onDiscard={() => setProfile((p:any) => ({...p, researchExperience: JSON.parse(JSON.stringify(initialProfile.researchExperience || []))}))} />
+              </div>
+            )}
+
+            {/* 11. AWARDS */}
+            {showSection("Awards") && (
+              <div ref={sectionRefs["Awards"]} className="mb-8 p-5 bg-slate-50/50 border border-slate-100 rounded-2xl">
+                <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2"><Award className="text-blue-600" size={18}/><h4 className="font-bold text-sm text-slate-800">Awards</h4></div>
+                  <button onClick={() => addArrayItem("awards", { awardName: "", organization: "", description: "" })} className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"><Plus size={14}/> Add Award</button>
+                </div>
+                <div className="space-y-4">
+                  {profile.awards?.length === 0 && <p className="text-xs text-slate-400 italic">No items added.</p>}
+                  {profile.awards?.map((awd: any, idx: number) => (
+                    <div key={awd.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative">
+                      <button onClick={() => removeArrayItem("awards", idx)} className="absolute top-4 right-4 text-slate-300 hover:text-red-500"><Trash2 size={16}/></button>
+                      <div className="grid grid-cols-2 gap-3 pr-8">
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">Award Name</label><input type="text" value={awd.awardName || ""} onChange={e => handleArrayChange("awards", idx, "awardName", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none font-semibold focus:border-blue-500"/></div>
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">Organization</label><input type="text" value={awd.organization || ""} onChange={e => handleArrayChange("awards", idx, "organization", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none focus:border-blue-500"/></div>
+                        <div className="col-span-2"><label className="text-[10px] uppercase font-bold text-slate-400">Description</label><textarea value={awd.description || ""} onChange={e => handleArrayChange("awards", idx, "description", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none resize-none focus:border-blue-500" rows={2}/></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <SaveControls isDirty={isCollectionDirty("awards")} isSaving={isSaving} onSave={() => saveCollectionSection("award", "awards")} onDiscard={() => setProfile((p:any) => ({...p, awards: JSON.parse(JSON.stringify(initialProfile.awards || []))}))} />
+              </div>
+            )}
+
+            {/* 12. VOLUNTEER */}
+            {showSection("Volunteer") && (
+              <div ref={sectionRefs["Volunteer"]} className="mb-8 p-5 bg-slate-50/50 border border-slate-100 rounded-2xl">
+                <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2"><Users className="text-blue-600" size={18}/><h4 className="font-bold text-sm text-slate-800">Volunteer Work</h4></div>
+                  <button onClick={() => addArrayItem("volunteer", { role: "", organization: "", description: "" })} className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"><Plus size={14}/> Add Volunteer</button>
+                </div>
+                <div className="space-y-4">
+                  {profile.volunteer?.length === 0 && <p className="text-xs text-slate-400 italic">No items added.</p>}
+                  {profile.volunteer?.map((vol: any, idx: number) => (
+                    <div key={vol.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative">
+                      <button onClick={() => removeArrayItem("volunteer", idx)} className="absolute top-4 right-4 text-slate-300 hover:text-red-500"><Trash2 size={16}/></button>
+                      <div className="grid grid-cols-2 gap-3 pr-8">
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">Role</label><input type="text" value={vol.role || ""} onChange={e => handleArrayChange("volunteer", idx, "role", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none font-semibold focus:border-blue-500"/></div>
+                        <div><label className="text-[10px] uppercase font-bold text-slate-400">Organization</label><input type="text" value={vol.organization || ""} onChange={e => handleArrayChange("volunteer", idx, "organization", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none focus:border-blue-500"/></div>
+                        <div className="col-span-2"><label className="text-[10px] uppercase font-bold text-slate-400">Description</label><textarea value={vol.description || ""} onChange={e => handleArrayChange("volunteer", idx, "description", e.target.value)} className="w-full border-b border-slate-200 py-1 text-sm outline-none resize-none focus:border-blue-500" rows={2}/></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <SaveControls isDirty={isCollectionDirty("volunteer")} isSaving={isSaving} onSave={() => saveCollectionSection("volunteer", "volunteer")} onDiscard={() => setProfile((p:any) => ({...p, volunteer: JSON.parse(JSON.stringify(initialProfile.volunteer || []))}))} />
+              </div>
+            )}
+
+            {/* 13. MEMBERSHIPS */}
+            {showSection("Memberships") && (
+              <div ref={sectionRefs["Memberships"]} className="mb-8 p-5 bg-slate-50/50 border border-slate-100 rounded-2xl">
+                <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2"><Users className="text-blue-600" size={18}/><h4 className="font-bold text-sm text-slate-800">Memberships</h4></div>
+                  <button onClick={() => addArrayItem("memberships", { organizationName: "" })} className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"><Plus size={14}/> Add Membership</button>
+                </div>
                 <div className="space-y-3">
-                  {profile.volunteer.map((item) => (
-                    <div
-                      key={`${item.organization}-${item.role}`}
-                      className="rounded-xl border border-slate-200 p-4"
-                    >
-                      <p className="text-sm font-semibold text-slate-900">
-                        {item.role}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {item.organization}
-                      </p>
-                      <p className="mt-2 text-xs text-slate-500 leading-relaxed">
-                        {item.description}
-                      </p>
+                  {profile.memberships?.length === 0 && <p className="text-xs text-slate-400 italic">No items added.</p>}
+                  {profile.memberships?.map((mem: any, idx: number) => (
+                    <div key={mem.id} className="flex gap-2 items-center bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
+                      <input type="text" placeholder="Organization Name" value={mem.organizationName || ""} onChange={e => handleArrayChange("memberships", idx, "organizationName", e.target.value)} className="border-0 px-2 py-1 text-sm flex-1 outline-none font-semibold focus:text-blue-600"/>
+                      <button onClick={() => removeArrayItem("memberships", idx)} className="text-slate-400 hover:text-red-500 px-2 border-l border-slate-200"><Trash2 size={16}/></button>
                     </div>
                   ))}
                 </div>
-              </SectionCard>
+                <SaveControls isDirty={isCollectionDirty("memberships")} isSaving={isSaving} onSave={() => saveCollectionSection("membership", "memberships")} onDiscard={() => setProfile((p:any) => ({...p, memberships: JSON.parse(JSON.stringify(initialProfile.memberships || []))}))} />
+              </div>
             )}
 
-            {showSection("Memberships") && profile.memberships.length > 0 && (
-              <SectionCard icon={<Users size={18} />} title="Memberships">
-                <div className="flex flex-wrap gap-2">
-                  {profile.memberships.map((item) => (
-                    <span
-                      key={item.organizationName}
-                      className="bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200"
-                    >
-                      {item.organizationName}
-                    </span>
+            {/* 14. SOCIAL LINKS */}
+            {showSection("Social Links") && (
+              <div ref={sectionRefs["Social Links"]} className="mb-8 p-5 bg-slate-50/50 border border-slate-100 rounded-2xl">
+                <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2"><Link2 className="text-blue-600" size={18}/><h4 className="font-bold text-sm text-slate-800">Social Links</h4></div>
+                  <button onClick={() => addArrayItem("socialLinks", { platformName: "LinkedIn", profileUrl: "" })} className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"><Plus size={14}/> Add Link</button>
+                </div>
+                <div className="space-y-3">
+                  {profile.socialLinks?.length === 0 && <p className="text-xs text-slate-400 italic">No items added.</p>}
+                  {profile.socialLinks?.map((soc: any, idx: number) => (
+                    <div key={soc.id} className="flex gap-2 items-center bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
+                      <select value={soc.platformName || "LinkedIn"} onChange={e => handleArrayChange("socialLinks", idx, "platformName", e.target.value)} className="border-0 pl-2 py-1 text-sm outline-none bg-transparent text-slate-800 font-bold">
+                        <option>LinkedIn</option><option>GitHub</option><option>Twitter</option><option>Portfolio</option><option>Other</option>
+                      </select>
+                      <input type="url" placeholder="https://..." value={soc.profileUrl || ""} onChange={e => handleArrayChange("socialLinks", idx, "profileUrl", e.target.value)} className="border-l border-slate-200 px-2 py-1 text-sm flex-1 outline-none text-blue-600"/>
+                      <button onClick={() => removeArrayItem("socialLinks", idx)} className="text-slate-400 hover:text-red-500 px-2 border-l border-slate-200"><Trash2 size={16}/></button>
+                    </div>
                   ))}
                 </div>
-              </SectionCard>
+                <SaveControls isDirty={isCollectionDirty("socialLinks")} isSaving={isSaving} onSave={() => saveCollectionSection("social_link", "socialLinks")} onDiscard={() => setProfile((p:any) => ({...p, socialLinks: JSON.parse(JSON.stringify(initialProfile.socialLinks || []))}))} />
+              </div>
             )}
+
           </div>
         </div>
 
-        <div className="space-y-5">
-          <div className="grid gap-5 xl:grid-cols-2">
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-              <h3 className="font-bold text-slate-900 mb-4">Resume</h3>
-              <p className="text-xs text-slate-400 mb-4">
-                Last updated: 2 days ago
-              </p>
-              <label className="flex flex-col items-center justify-center gap-3 border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl py-8 cursor-pointer transition-colors group">
-                <div className="w-12 h-12 rounded-xl bg-blue-50 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
-                  <Upload size={22} className="text-blue-600" />
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-semibold text-slate-700">
-                    Click to upload or drag and drop
-                  </p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    PDF, DOCX up to 10MB
-                  </p>
-                </div>
-                <input type="file" className="hidden" accept=".pdf,.docx" />
-              </label>
-            </div>
-
-            {/* Quick Details removed per request */}
-
-            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-              <h3 className="font-bold text-slate-900 mb-4">Export</h3>
-              <p className="text-xs text-slate-500">
-                Use the header actions to view or download the CV.
-              </p>
-            </div>
+        {/* RIGHT COLUMN: AI SYNC & LINKEDIN */}
+        <div className="space-y-6">
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+            <h3 className="font-bold text-slate-900 mb-2 flex items-center gap-2"><FileText size={18} className="text-blue-600"/> Parse Resume PDF</h3>
+            <p className="text-xs text-slate-400 mb-4">Upload your raw document. Our AI pipeline will automatically extract structures.</p>
+            <label className="flex flex-col items-center gap-3 border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl py-6 cursor-pointer">
+              {isUploading ? (
+                <div className="text-center py-2"><Loader2 className="animate-spin text-blue-600 mx-auto mb-2"/><p className="text-xs font-semibold">Processing PDF...</p></div>
+              ) : (
+                <><div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center"><Upload size={18} className="text-blue-600" /></div><p className="text-xs font-bold text-slate-700">Drop resume file</p></>
+              )}
+              <input type="file" onChange={handlePDFUpload} disabled={isUploading} className="hidden" accept=".pdf,.docx" />
+            </label>
           </div>
 
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-            <h3 className="font-bold text-slate-900 mb-4">Coverage</h3>
-            <div className="space-y-2 text-sm text-slate-600">
-              <p>{profile.experience.length} experience entries</p>
-              <p>{profile.education.length} education entries</p>
-              <p>{profile.projects.length} projects</p>
-              <p>{profile.publications.length} publications</p>
-            </div>
+            <h3 className="font-bold text-slate-900 mb-2 flex items-center gap-2"><Link2 size={18} className="text-indigo-600"/> Synchronize LinkedIn</h3>
+            <p className="text-xs text-slate-400 mb-3">Supply your public profile URL to extract missing historical records automatically.</p>
+            <form onSubmit={handleLinkedInSync} className="space-y-2">
+              <input type="url" required value={linkedInUrl} onChange={e => setLinkedInUrl(e.target.value)} placeholder="https://www.linkedin.com/in/username" className="w-full border rounded-xl p-2.5 text-xs outline-none"/>
+              <button type="submit" disabled={isSyncingLinkedIn || !linkedInUrl} className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-100 disabled:text-slate-400 text-white font-bold py-2 rounded-xl text-xs flex justify-center gap-2">
+                {isSyncingLinkedIn ? <Loader2 size={14} className="animate-spin"/> : <RefreshCw size={14}/>} Sync Workspace
+              </button>
+            </form>
+          </div>
+
+          <div className="bg-slate-900 text-slate-200 rounded-2xl p-4 shadow-sm">
+            <p className="text-[11px] font-bold text-amber-400 uppercase mb-1">Smart Merge Engine</p>
+            <p className="text-xs text-slate-400">You can fill data using these tools. The engine will ensure it <strong>only fills empty spaces</strong> and appends new arrays without wiping your entries.</p>
           </div>
         </div>
       </div>

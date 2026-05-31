@@ -42,8 +42,28 @@ export default function SignupPage() {
       );
       router.push("/dashboard"); 
     } catch (err: any) {
-      // Professionally extracts custom exception string or server message
-      const finalMsg = err.response?.data?.error || err.message || "An unexpected registration failure occurred.";
+      // 🔍 1. Print the raw object to the console so we can see its true shape
+      console.error("RAW ERROR OBJECT:", err);
+
+      let finalMsg = "An unexpected registration failure occurred.";
+
+      // 🔍 2. Is it a Firebase Client Error? (Firebase errors use 'code')
+      if (err.code) {
+        console.error("🔥 FIREBASE REJECTION:", err.code);
+        if (err.code === "auth/email-already-in-use") finalMsg = "This email is already registered. Please log in.";
+        else finalMsg = err.message;
+      } 
+      // 🔍 3. Is it a .NET Backend Error? (Axios uses 'response')
+      else if (err.response?.data) {
+        console.error("⚙️ .NET BACKEND REJECTION:", err.response.data);
+        finalMsg = err.response.data.error || err.response.data.title || err.response.data.detail || "Backend validation failed.";
+      } 
+      // 🔍 4. Is it a Network/CORS crash?
+      else if (err.message) {
+        console.error("🌐 NETWORK/CORS ERROR:", err.message);
+        finalMsg = err.message;
+      }
+
       setErrorMessage(finalMsg);
     } finally {
       setIsLoading(false);
