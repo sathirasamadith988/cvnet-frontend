@@ -38,8 +38,8 @@ const statusColors: Record<string, string> = {
 
 const pieColorPalette = ["#2563eb", "#ef4444", "#f59e0b"];
 
-// Normalizing strictly to UI-fill widths (Beginner 10%, Intermediate 40%, Expert 100%)
-const levelVisualPercentages: Record<number, number> = { 0: 0, 1: 10, 2: 40, 3: 100 };
+// ✅ FIX: Visually aligned perfectly with the backend math logic
+const levelVisualPercentages: Record<number, number> = { 0: 0, 1: 7.5, 2: 34, 3: 85 };
 const levelLabels: Record<number, string> = { 0: "Missing", 1: "Beginner", 2: "Intermediate", 3: "Expert" };
 
 const parseLevel = (lvl?: string) => {
@@ -92,7 +92,7 @@ export default function DashboardPage() {
         });
         
         setSkillBreakdown(matrixRes.data?.breakdown || []);
-        setMatrixMatchScore(matrixRes.data?.matchScore || 0); // Override naive summary percentage
+        setMatrixMatchScore(matrixRes.data?.matchScore || 0);
       }
     } catch (err: any) {
       console.error("Dashboard payload loading failure:", err);
@@ -183,7 +183,6 @@ export default function DashboardPage() {
   const displaySkills = useMemo(() => {
     if (!skillBreakdown || skillBreakdown.length === 0) return [];
 
-    // Backend already maps Top 4 Core + "Other Category Skills". Just slice and calculate visual widths.
     return skillBreakdown.slice(0, 5).map(s => {
       const uVal = parseLevel(s.userDeclaredLevel);
       const eVal = parseLevel(s.expectedLevel);
@@ -191,7 +190,7 @@ export default function DashboardPage() {
         name: s.skillName,
         uVal,
         eVal,
-        expectedPercentage: levelVisualPercentages[eVal] || 10
+        expectedPercentage: levelVisualPercentages[eVal] || 7.5
       };
     });
   }, [skillBreakdown]);
@@ -368,30 +367,32 @@ export default function DashboardPage() {
               <Link href="/skill-gap" className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">View Details <ArrowRight size={12} /></Link>
             </div>
 
-            <h3 className="text-sm font-semibold text-slate-700 mb-3">Top Core Requirements</h3>
+            <h3 className="text-sm font-semibold text-slate-700 mb-4">Top Core Requirements</h3>
             {(!displaySkills || displaySkills.length === 0) ? (
               <p className="text-sm text-slate-400 py-4 text-center">No track selected or matrix is generating.</p>
             ) : (
-              <div className="space-y-3.5">
+              <div className="space-y-4">
                 {displaySkills.map((skill, idx) => {
                   const barColor = getSkillGapColor(skill.uVal, skill.eVal);
                   const fillPercentage = levelVisualPercentages[skill.uVal] || 0;
 
                   return (
-                    <div key={idx} className="flex items-center gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-medium text-slate-700">{skill.name}</span>
-                          <span className="text-[10px] uppercase font-bold text-slate-400">
-                            {levelLabels[skill.uVal]} / {levelLabels[skill.eVal]} target
-                          </span>
+                    <div key={idx} className="flex flex-col gap-1.5">
+                      <div className="flex items-end justify-between">
+                        <div>
+                          <span className="text-[13px] font-extrabold text-slate-800 block">{skill.name}</span>
+                          <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Current: {levelLabels[skill.uVal]}</span>
                         </div>
-                        <div className="relative bg-slate-100 rounded-full h-2 w-full">
-                          {/* User Level Fill */}
-                          <div className={`absolute top-0 bottom-0 left-0 rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${fillPercentage}%` }} />
-                          {/* Expected Level Tick */}
-                          <div className="absolute top-[-2px] bottom-[-2px] w-0.5 bg-slate-900 z-10 rounded-full" style={{ left: `${skill.expectedPercentage}%` }} />
-                        </div>
+                        {/* THE CORNER TARGET BADGE */}
+                        <span className="text-[9px] uppercase font-extrabold tracking-widest text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded flex items-center gap-1 shadow-sm">
+                          <Target size={10} /> Target: {levelLabels[skill.eVal]}
+                        </span>
+                      </div>
+                      <div className="relative bg-slate-100 rounded-full h-2 w-full mt-1">
+                        {/* User Level Fill */}
+                        <div className={`absolute top-0 bottom-0 left-0 rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${fillPercentage}%` }} />
+                        {/* Expected Level Tick */}
+                        <div className="absolute top-[-3px] bottom-[-3px] w-0.5 bg-slate-800 z-10 rounded-full" style={{ left: `${skill.expectedPercentage}%` }} />
                       </div>
                     </div>
                   );
@@ -402,11 +403,11 @@ export default function DashboardPage() {
           
           {/* COURSE RECOMMENDATION BOX */}
           {displaySkills && displaySkills.length > 0 && displaySkills.some(s => s.uVal > 0 && s.uVal < s.eVal) && (
-            <div className="mt-5 pt-5 border-t border-slate-100">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center"><Briefcase size={15} className="text-blue-600" /></div>
+            <div className="mt-6 pt-5 border-t border-slate-100">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0"><Briefcase size={15} className="text-blue-600" /></div>
                 <div>
-                  <p className="text-sm font-semibold text-slate-900">
+                  <p className="text-sm font-semibold text-slate-900 leading-tight">
                     Suggested: {displaySkills.find(s => s.uVal > 0 && s.uVal < s.eVal)?.name} Course
                   </p>
                   <p className="text-xs text-slate-400">Recommendation based on your top skill gap</p>
