@@ -222,7 +222,7 @@ export default function DashboardPage() {
           <p className="text-slate-500 text-sm mt-0.5">Here's what's happening with your career today.</p>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/applications/jobs" className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm transition-colors hover:bg-blue-50">
+          <Link href="/applications" className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm transition-colors hover:bg-blue-50">
             <Search size={16} /> Search Jobs & Skills
           </Link>
           <button aria-label="Notifications" className="relative p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">

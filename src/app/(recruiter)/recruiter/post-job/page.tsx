@@ -1,381 +1,429 @@
 'use client';
 
-import { useState } from 'react';
-import { X, Plus, MapPin, DollarSign, Eye } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, MapPin, Briefcase, Calendar, Loader2, EyeOff, GraduationCap, Banknote, ListChecks } from 'lucide-react';
+import axios from 'axios';
+import { auth } from '@/lib/firebaseConfig';
 
-const requiredSkillOptions = ['Figma', 'UI Design', 'Design Systems', 'Prototyping', 'React', 'Python', 'SQL', 'AWS', 'Product Management', 'Agile'];
+type CategoryData = { id: string; name: string; roles: string[] };
+type SkillData = { name: string; level: string; isVisible: boolean; showLevel: boolean };
+
+// Global Currency List for the Select Dropdown
+const WORLD_CURRENCIES = [
+  { code: 'LKR', symbol: 'Rs', name: 'Sri Lankan Rupee' },
+  { code: 'USD', symbol: '$', name: 'US Dollar' },
+  { code: 'EUR', symbol: '€', name: 'Euro' },
+  { code: 'GBP', symbol: '£', name: 'British Pound' },
+  { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
+  { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' },
+  { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar' },
+  { code: 'SGD', symbol: 'S$', name: 'Singapore Dollar' },
+  { code: 'AED', symbol: 'د.إ', name: 'UAE Dirham' },
+  { code: 'JPY', symbol: '¥', name: 'Japanese Yen' }
+];
 
 export default function PostJobPage() {
   const [step, setStep] = useState(1);
-  const [skills, setSkills] = useState(['Figma', 'UI Design', 'Design Systems']);
-  const [newSkill, setNewSkill] = useState('');
-  const [jobTitle, setJobTitle] = useState('Senior Product Designer');
-  const [dept, setDept] = useState('Design');
-  const [description, setDescription] = useState('We are looking for a Senior Product Designer to join our fast-growing team. You will be responsible for leading the design of our core platform features...');
-  const [expLevel, setExpLevel] = useState('Mid-Senior Level (5+ years)');
-  const [education, setEducation] = useState("Bachelor's Degree");
-  const [location, setLocation] = useState('San Francisco, CA (Remote Friendly)');
-  const [salaryMin, setSalaryMin] = useState('120,000');
-  const [salaryMax, setSalaryMax] = useState('160,000');
+  const [isLoading, setIsLoading] = useState(false);
+  const [categories, setCategories] = useState<CategoryData[]>([]);
 
-  // New States for Step 2 & 3
-  const [responsibilities, setResponsibilities] = useState('• Lead the design of core platform features from concept to launch\n• Work closely with product managers and engineers to define requirements\n• Mentor junior designers and provide constructive feedback');
-  const [qualifications, setQualifications] = useState('• 5+ years of experience in product design\n• Strong portfolio demonstrating excellence in UI/UX\n• Experience with Figma and modern design tools');
-  const [benefits, setBenefits] = useState(['Health Insurance', 'Remote Work', '401(k) Matching']);
+  // Relational Form State
+  const [categoryId, setCategoryId] = useState('');
+  const [jobTitle, setJobTitle] = useState('');
+  const [employmentType, setEmploymentType] = useState('FULL_TIME');
+  const [workplaceType, setWorkplaceType] = useState('REMOTE');
+  const [location, setLocation] = useState('');
+  const [description, setDescription] = useState('');
+  
+  // Advanced Skills State
+  const [skills, setSkills] = useState<SkillData[]>([]);
+  const [newSkillName, setNewSkillName] = useState('');
+  const [newSkillLevel, setNewSkillLevel] = useState('INTERMEDIATE');
+  const [newSkillIsVisible, setNewSkillIsVisible] = useState(true);
+  const [newSkillShowLevel, setNewSkillShowLevel] = useState(true);
+  
+  // Experience State
+  const [expLevelName, setExpLevelName] = useState('');
+  const [expMinYears, setExpMinYears] = useState(0);
+  const [expMaxYears, setExpMaxYears] = useState(0);
+  
+  // Education & Responsibilities State
+  const [educations, setEducations] = useState<string[]>([]);
+  const [newDegree, setNewDegree] = useState('');
+  const [responsibilities, setResponsibilities] = useState(''); // ✅ State is here
+  
+  // Currency & Salary State
+  const [salaryRange, setSalaryRange] = useState('');
+  const [currency, setCurrency] = useState('LKR');
+  
+  const [openings, setOpenings] = useState(1);
+  const [hrEmail, setHrEmail] = useState('');
+  const [applicationDeadline, setApplicationDeadline] = useState(
+    new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0]
+  );
 
-  const addSkill = (skill: string) => {
-    if (skill && !skills.includes(skill)) {
-      setSkills([...skills, skill]);
-      setNewSkill('');
+  useEffect(() => {
+    const fetchMeta = async (token: string) => {
+      try {
+        const res = await axios.get('http://localhost:5167/api/CompanyJob/categories', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setCategories(res.data);
+        if (res.data.length > 0) {
+          setCategoryId(res.data[0].id);
+          setJobTitle(res.data[0].roles[0] || '');
+        }
+      } catch (err) { console.error("Failed to load DB Meta", err); }
+    };
+    
+    const unsub = auth.onAuthStateChanged(async (user) => {
+      if(user) { 
+        setHrEmail(user.email || '');
+        try {
+          const token = await user.getIdToken(true); 
+          fetchMeta(token); 
+        } catch (e) {
+          console.error("Failed to fetch fresh token.");
+        }
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const cat = categories.find(c => c.id === categoryId);
+    if (cat && cat.roles.length > 0) setJobTitle(cat.roles[0]);
+  }, [categoryId, categories]);
+
+  const addSkill = () => {
+    if (newSkillName.trim() && !skills.find(s => s.name.toLowerCase() === newSkillName.trim().toLowerCase())) {
+      setSkills([...skills, { 
+        name: newSkillName.trim(), 
+        level: newSkillLevel, 
+        isVisible: newSkillIsVisible, 
+        showLevel: newSkillShowLevel 
+      }]);
+      setNewSkillName('');
+      setNewSkillIsVisible(true);
+      setNewSkillShowLevel(true);
     }
   };
-  const removeSkill = (skill: string) => setSkills(skills.filter(s => s !== skill));
+  const removeSkill = (name: string) => setSkills(skills.filter(s => s.name !== name));
 
-  const steps = ['Basic Info', 'Requirements', 'Review & Post'];
+  const addEducation = () => {
+    if (newDegree.trim() && !educations.includes(newDegree.trim())) {
+      setEducations([...educations, newDegree.trim()]);
+      setNewDegree('');
+    }
+  };
+  const removeEducation = (deg: string) => setEducations(educations.filter(e => e !== deg));
+
+  const handlePostJob = async () => {
+    setIsLoading(true);
+    try {
+      let token = await auth.currentUser?.getIdToken();
+      if (!token) {
+        const cookieMatch = document.cookie.match(/(?:^|; )cvnet_token=([^;]*)/);
+        token = cookieMatch ? cookieMatch[1] : undefined;
+      }
+
+      if (!token) {
+        alert("Authentication lost. Please reload the page.");
+        setIsLoading(false);
+        return;
+      }
+
+      const payload = {
+        categoryId, jobTitle, employmentType, workplaceType, 
+        location: location || null, 
+        openings,
+        description: description || null, 
+        responsibilities: responsibilities || null, // ✅ Sends to Backend
+        salaryRange: salaryRange || null, 
+        currency: currency,
+        applicationDeadline: new Date(applicationDeadline).toISOString(),
+        hrContactEmail: hrEmail,
+        skills,
+        experience: expLevelName ? { levelName: expLevelName, minYears: expMinYears, maxYears: expMaxYears } : null,
+        educations 
+      };
+
+      await axios.post('http://localhost:5167/api/CompanyJob/create', payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      alert('Job Successfully Posted to the Network!');
+      window.location.href = '/recruiter/dashboard';
+    } catch (err: any) {
+      console.error(err);
+      alert(err.response?.data?.error || 'Failed to post job. Please verify your connection.');
+      setIsLoading(false);
+    }
+  };
+
+  const currentDepartmentName = categories.find(c => c.id === categoryId)?.name || 'Department';
+  const selectedCurrencySymbol = WORLD_CURRENCIES.find(c => c.code === currency)?.symbol || currency;
 
   return (
     <div className="p-6 sm:p-8 max-w-7xl">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Job Management</p>
-          <h1 className="text-2xl font-extrabold text-slate-900">Post a New Job</h1>
-        </div>
-      </div>
-
-      {/* Stepper */}
-      <div className="flex items-center gap-3 mb-8">
-        {steps.map((label, i) => (
-          <div key={label} className="flex items-center gap-2">
-            <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold transition-colors ${i + 1 === step ? 'bg-blue-600 text-white' : i + 1 < step ? 'bg-green-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
-              {i + 1 < step ? '✓' : i + 1}
-            </div>
-            <span className={`text-sm font-semibold hidden sm:block ${i + 1 === step ? 'text-blue-600' : 'text-slate-400'}`}>{label}</span>
-            {i < steps.length - 1 && <div className="h-px w-6 bg-slate-200 mx-1 hidden sm:block" />}
-          </div>
-        ))}
-        <span className="ml-auto text-xs text-slate-400 font-medium">Step {step} of {steps.length}</span>
+      <div className="mb-8">
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Company Dashboard</p>
+        <h1 className="text-2xl font-extrabold text-slate-900">Post a New Position</h1>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Main Form Area */}
+        
+        {/* FORM AREA */}
         <div className="lg:col-span-2 space-y-5">
-
-          {/* Step 1: Basic Info */}
+          
           {step === 1 && (
-            <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <h2 className="font-bold text-slate-900 mb-5">Basic Job Information</h2>
+            <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm animate-in fade-in">
+              <h2 className="font-bold text-slate-900 mb-5">Job Logistics</h2>
               <div className="space-y-4">
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="jobTitle" className="block text-sm font-semibold text-slate-700 mb-1.5">Job Title</label>
-                    <input id="jobTitle" value={jobTitle} onChange={e => setJobTitle(e.target.value)} className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Department (Category)</label>
+                    <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 outline-none">
+                      {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
                   </div>
                   <div>
-                    <label htmlFor="dept" className="block text-sm font-semibold text-slate-700 mb-1.5">Department</label>
-                    <select id="dept" value={dept} onChange={e => setDept(e.target.value)} className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
-                      {['Design', 'Engineering', 'Marketing', 'Data', 'Human Resources', 'Product'].map(d => <option key={d}>{d}</option>)}
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Job Title</label>
+                    <select value={jobTitle} onChange={e => setJobTitle(e.target.value)} className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 outline-none">
+                      {(categories.find(c => c.id === categoryId)?.roles || []).map(r => <option key={r} value={r}>{r}</option>)}
                     </select>
                   </div>
                 </div>
 
-                <div>
-                  <label htmlFor="description" className="block text-sm font-semibold text-slate-700 mb-1.5">Job Description</label>
-                  <textarea id="description" value={description} onChange={e => setDescription(e.target.value)} rows={4} className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none" />
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Employment & Workplace</label>
+                    <div className="flex gap-2">
+                        <select value={employmentType} onChange={e => setEmploymentType(e.target.value)} className="flex-1 px-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 outline-none">
+                        <option value="FULL_TIME">Full Time</option><option value="PART_TIME">Part Time</option><option value="CONTRACT">Contract</option><option value="INTERNSHIP">Internship</option>
+                        </select>
+                        <select value={workplaceType} onChange={e => setWorkplaceType(e.target.value)} className="flex-1 px-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 outline-none">
+                        <option value="REMOTE">Remote</option><option value="HYBRID">Hybrid</option><option value="ONSITE">On-Site</option>
+                        </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Location (Optional)</label>
+                    <input value={location} onChange={e => setLocation(e.target.value)} placeholder="e.g. San Francisco, CA" className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 outline-none" />
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Required Skills</label>
-                  <div className="flex flex-wrap gap-2 mb-2">
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Job Description (Optional)</label>
+                  <textarea value={description} onChange={e => setDescription(e.target.value)} rows={4} placeholder="General overview of the role..." className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 outline-none resize-none" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm animate-in fade-in">
+              <h2 className="font-bold text-slate-900 mb-5">Job Requirements</h2>
+              <div className="space-y-6">
+                
+                {/* ✅ RESTORED: Responsibilities Input */}
+                <div className="bg-slate-50 p-4 border border-slate-200 rounded-xl">
+                  <label className="block text-sm font-bold text-slate-800 mb-1.5">Key Responsibilities (Optional)</label>
+                  <p className="text-xs text-slate-500 mb-3">What will this person do on a day-to-day basis?</p>
+                  <textarea 
+                    value={responsibilities} 
+                    onChange={e => setResponsibilities(e.target.value)} 
+                    rows={4} 
+                    placeholder="• Lead the development of...&#10;• Collaborate with..." 
+                    className="w-full px-4 py-3 text-sm border border-slate-200 rounded-lg bg-white outline-none resize-none" 
+                  />
+                </div>
+
+                <div className="bg-slate-50 p-4 border border-slate-200 rounded-xl">
+                  <label className="block text-sm font-bold text-slate-800 mb-3">Required Technical Skills</label>
+                  <div className="flex flex-wrap gap-2 mb-4">
                     {skills.map(skill => (
-                      <span key={skill} className="flex items-center gap-1 bg-blue-100 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-full">
-                        {skill}
-                        <button
-                          aria-label={`Remove ${skill}`}
-                          onClick={() => removeSkill(skill)}
-                          className="hover:text-red-600 transition-colors"
-                        >
-                          <X size={11} />
-                        </button>
+                      <span key={skill.name} className={`flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border ${skill.isVisible ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-slate-200 text-slate-500 border-slate-300'}`}>
+                        {!skill.isVisible && <EyeOff size={10} className="mr-0.5" />}
+                        {skill.name} {skill.showLevel && <span className="opacity-60 text-[10px]">({skill.level})</span>}
+                        <button onClick={() => removeSkill(skill.name)} className="hover:text-red-600 transition-colors ml-1"><X size={11} /></button>
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="space-y-3 p-3 bg-white border border-slate-200 rounded-lg shadow-sm">
+                    <div className="flex gap-2">
+                        <input value={newSkillName} onChange={e => setNewSkillName(e.target.value)} placeholder="e.g. React.js" className="flex-1 px-3 py-2 text-sm border rounded-lg outline-none focus:border-blue-500" />
+                        <select value={newSkillLevel} onChange={e => setNewSkillLevel(e.target.value)} className="px-3 py-2 text-sm border rounded-lg outline-none font-bold text-slate-600 bg-slate-50">
+                        <option value="BEGINNER">Beginner</option><option value="INTERMEDIATE">Intermediate</option><option value="EXPERT">Expert</option>
+                        </select>
+                        <button onClick={addSkill} disabled={!newSkillName.trim()} className="bg-slate-900 text-white px-4 py-2 rounded-lg text-xs font-bold disabled:opacity-50 transition-colors hover:bg-slate-800">Add</button>
+                    </div>
+                    
+                    <div className="flex gap-4 border-t border-slate-100 pt-3">
+                        <label className="flex items-center gap-2 cursor-pointer group">
+                            <input type="checkbox" checked={newSkillIsVisible} onChange={e => setNewSkillIsVisible(e.target.checked)} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                            <span className="text-xs font-semibold text-slate-600 group-hover:text-slate-900 transition-colors">Show to Candidates</span>
+                        </label>
+                        <label className={`flex items-center gap-2 cursor-pointer group ${!newSkillIsVisible && 'opacity-40 pointer-events-none'}`}>
+                            <input type="checkbox" checked={newSkillShowLevel} onChange={e => setNewSkillShowLevel(e.target.checked)} className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                            <span className="text-xs font-semibold text-slate-600 group-hover:text-slate-900 transition-colors">Display Expected Level</span>
+                        </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 p-4 border border-slate-200 rounded-xl">
+                  <label className="block text-sm font-bold text-slate-800 mb-3">Specific Education Degrees (Optional)</label>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {educations.map(deg => (
+                      <span key={deg} className="flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-semibold px-2.5 py-1 rounded-full border border-indigo-200">
+                        {deg}
+                        <button onClick={() => removeEducation(deg)} className="hover:text-red-600 transition-colors ml-1"><X size={11} /></button>
                       </span>
                     ))}
                   </div>
                   <div className="flex gap-2">
-                    <div className="flex-1 relative">
-                      <input
-                        value={newSkill}
-                        onChange={e => setNewSkill(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && addSkill(newSkill)}
-                        placeholder="Add skills..."
-                        className="w-full px-4 py-2 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <button onClick={() => addSkill(newSkill)} className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-2 rounded-xl transition-colors">
-                      <Plus size={14} /> Add
+                    <input 
+                      value={newDegree} 
+                      onChange={e => setNewDegree(e.target.value)} 
+                      placeholder="e.g. BSc Hons in Computing and Information Systems" 
+                      className="flex-1 px-3 py-2 text-sm border rounded-lg outline-none focus:border-blue-500" 
+                    />
+                    <button 
+                      onClick={addEducation} 
+                      disabled={!newDegree.trim()} 
+                      className="bg-slate-900 text-white px-4 py-2 rounded-lg text-xs font-bold disabled:opacity-50 transition-colors hover:bg-slate-800"
+                    >
+                      Add Degree
                     </button>
                   </div>
                 </div>
 
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="expLevel" className="block text-sm font-semibold text-slate-700 mb-1.5">Experience Level</label>
-                    <select id="expLevel" value={expLevel} onChange={e => setExpLevel(e.target.value)} className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                      {['Entry Level (0-2 years)', 'Mid Level (2-5 years)', 'Mid-Senior Level (5+ years)', 'Senior (8+ years)', 'Director/Executive'].map(e => <option key={e}>{e}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label htmlFor="education" className="block text-sm font-semibold text-slate-700 mb-1.5">Education Requirement</label>
-                    <select id="education" value={education} onChange={e => setEducation(e.target.value)} className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                      {["High School", "Associate's Degree", "Bachelor's Degree", "Master's Degree", "PhD", "Any"].map(e => <option key={e}>{e}</option>)}
-                    </select>
+                <div className="bg-slate-50 p-4 border border-slate-200 rounded-xl">
+                  <label className="block text-sm font-bold text-slate-800 mb-3">Experience Requirement (Optional)</label>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div><label className="text-[10px] uppercase font-bold text-slate-400">Level Name</label><input value={expLevelName} onChange={e => setExpLevelName(e.target.value)} placeholder="e.g. Mid-Level" className="w-full px-3 py-2 text-sm border rounded-lg outline-none" /></div>
+                    <div><label className="text-[10px] uppercase font-bold text-slate-400">Min Years</label><input type="number" value={expMinYears} onChange={e => setExpMinYears(Number(e.target.value))} className="w-full px-3 py-2 text-sm border rounded-lg outline-none" /></div>
+                    <div><label className="text-[10px] uppercase font-bold text-slate-400">Max Years</label><input type="number" value={expMaxYears} onChange={e => setExpMaxYears(Number(e.target.value))} className="w-full px-3 py-2 text-sm border rounded-lg outline-none" /></div>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
 
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="location" className="block text-sm font-semibold text-slate-700 mb-1.5">
-                      <MapPin size={13} className="inline mr-1 text-slate-400" />Location
-                    </label>
-                    <input
-                      id="location"
-                      value={location}
-                      onChange={e => setLocation(e.target.value)}
-                      className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          {step === 3 && (
+            <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm animate-in fade-in">
+              <h2 className="font-bold text-slate-900 mb-5">Final Configurations</h2>
+              <div className="grid sm:grid-cols-2 gap-4">
+                
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Salary Range (Optional)</label>
+                  <div className="flex gap-2">
+                    <select 
+                      value={currency} 
+                      onChange={e => setCurrency(e.target.value)} 
+                      className="w-24 px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 outline-none font-bold text-slate-600"
+                    >
+                      {WORLD_CURRENCIES.map(c => (
+                        <option key={c.code} value={c.code}>{c.code}</option>
+                      ))}
+                    </select>
+                    <input 
+                      value={salaryRange} 
+                      onChange={e => setSalaryRange(e.target.value)} 
+                      placeholder="80,000 - 120,000" 
+                      className="flex-1 px-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 outline-none" 
                     />
                   </div>
-                  <div>
-                    <label htmlFor="salaryMin" className="block text-sm font-semibold text-slate-700 mb-1.5">
-                      <DollarSign size={13} className="inline mr-1 text-slate-400" />Salary Range (Annual)
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        id="salaryMin"
-                        value={`$${salaryMin}`}
-                        onChange={e => setSalaryMin(e.target.value.replace('$', ''))}
-                        className="flex-1 min-w-0 px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <span className="text-slate-400 text-sm">–</span>
-                      <input
-                        id="salaryMax"
-                        aria-label="Maximum salary"
-                        value={`$${salaryMax}`}
-                        onChange={e => setSalaryMax(e.target.value.replace('$', ''))}
-                        className="flex-1 min-w-0 px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Application Deadline</label>
+                  <input type="date" value={applicationDeadline} onChange={e => setApplicationDeadline(e.target.value)} className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 outline-none" />
                 </div>
               </div>
             </div>
           )}
 
-          {/* Step 2: Requirements */}
-          {step === 2 && (
-            <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <h2 className="font-bold text-slate-900 mb-5">Job Requirements & Details</h2>
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Key Responsibilities</label>
-                  <p className="text-xs text-slate-400 mb-2">Use bullet points for better readability.</p>
-                  <textarea
-                    value={responsibilities}
-                    onChange={e => setResponsibilities(e.target.value)}
-                    rows={6}
-                    placeholder="Enter key responsibilities..."
-                    className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Essential Qualifications</label>
-                  <textarea
-                    value={qualifications}
-                    onChange={e => setQualifications(e.target.value)}
-                    rows={6}
-                    placeholder="Enter required qualifications..."
-                    className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-3">Employee Benefits & Perks</label>
-                  <div className="flex flex-wrap gap-2">
-                    {['Health Insurance', 'Remote Work', '401(k) Matching', 'Unlimited PTO', 'Gym Membership', 'Stock Options', 'Relocation Bonus'].map(b => (
-                      <button
-                        key={b}
-                        onClick={() => benefits.includes(b) ? setBenefits(benefits.filter(item => item !== b)) : setBenefits([...benefits, b])}
-                        className={`text-xs px-4 py-2 rounded-xl border transition-all ${benefits.includes(b) ? 'bg-blue-50 border-blue-200 text-blue-700 font-bold' : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'}`}
-                      >
-                        {benefits.includes(b) && '✓ '} {b}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: Review & Post */}
-          {step === 3 && (
-            <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <h2 className="font-bold text-slate-900 mb-5">Review & Publish</h2>
-
-              <div className="space-y-6">
-                <div className="grid sm:grid-cols-2 gap-6 bg-slate-50 rounded-2xl p-5 border border-slate-100">
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Job Details</h3>
-                    <div className="space-y-2">
-                      <p className="text-sm font-bold text-slate-800">{jobTitle}</p>
-                      <p className="text-sm text-slate-600">{dept} Department</p>
-                      <p className="text-sm text-slate-600">{location}</p>
-                      <p className="text-sm text-blue-600 font-semibold">${salaryMin} - ${salaryMax}</p>
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Requirements</h3>
-                    <div className="space-y-2 text-sm text-slate-600">
-                      <p><span className="font-medium text-slate-800">Exp:</span> {expLevel}</p>
-                      <p><span className="font-medium text-slate-800">Edu:</span> {education}</p>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {skills.map(s => <span key={s} className="bg-white border border-slate-200 text-[10px] px-1.5 py-0.5 rounded text-slate-500">{s}</span>)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-800 mb-2">Job Description Preview</h3>
-                    <p className="text-sm text-slate-600 leading-relaxed bg-slate-50/50 p-4 rounded-xl border border-dashed border-slate-200">{description}</p>
-                  </div>
-
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="bg-blue-50/30 p-4 rounded-xl border border-blue-100/50">
-                      <h4 className="text-xs font-bold text-blue-800 mb-2 uppercase">Responsibilities</h4>
-                      <div className="text-xs text-slate-600 whitespace-pre-line leading-relaxed">{responsibilities}</div>
-                    </div>
-                    <div className="bg-indigo-50/30 p-4 rounded-xl border border-indigo-100/50">
-                      <h4 className="text-xs font-bold text-indigo-800 mb-2 uppercase">Qualifications</h4>
-                      <div className="text-xs text-slate-600 whitespace-pre-line leading-relaxed">{qualifications}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-slate-100">
-                  <label className="flex items-center gap-3 cursor-pointer group">
-                    <input type="checkbox" className="w-5 h-5 rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
-                    <span className="text-sm text-slate-600 group-hover:text-slate-900 transition-colors">I have reviewed the job details and confirm they are accurate.</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => setStep(Math.max(1, step - 1))}
-              disabled={step === 1}
-              className="px-5 py-2.5 text-sm font-semibold border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          <div className="flex justify-between">
+            <button onClick={() => setStep(step - 1)} disabled={step === 1} className="px-5 py-2.5 text-sm font-bold border rounded-xl text-slate-500 disabled:opacity-30">Back</button>
+            <button 
+              onClick={() => step < 3 ? setStep(step + 1) : handlePostJob()} 
+              disabled={isLoading}
+              className={`px-5 py-2.5 text-sm font-bold rounded-xl text-white transition-all flex items-center gap-2 ${step === 3 ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}`}
             >
-              ← Back
+              {isLoading && <Loader2 size={14} className="animate-spin"/>}
+              {step === 3 ? 'Publish Job' : 'Next Step'}
             </button>
-            <div className="flex gap-3">
-              <button className="px-5 py-2.5 text-sm font-semibold border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition-colors">Save Draft</button>
-              <button
-                onClick={() => {
-                  if (step < steps.length) {
-                    setStep(step + 1);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  } else {
-                    alert('Job Published Successfully!');
-                  }
-                }}
-                className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-all shadow-sm ${step === steps.length ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
-              >
-                {step === 1 ? 'Continue to Requirements →' : step === 2 ? 'Review & Post →' : 'Publish Job Now'}
-              </button>
-            </div>
           </div>
         </div>
 
-        {/* Live Preview Sidebar */}
+        {/* LIVE CANDIDATE VIEW */}
         <div className="space-y-4">
           <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-xl shadow-slate-200/50 sticky top-6 overflow-hidden">
-            {/* Header with Animation */}
-            <div className="bg-slate-900 px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                <h3 className="font-bold text-white text-xs uppercase tracking-widest">Live Candidate View</h3>
-              </div>
-              <span className="text-[10px] font-bold text-slate-400 bg-white/10 px-2 py-0.5 rounded">CVNet AI Preview</span>
+            <div className="bg-slate-900 px-6 py-4 flex items-center justify-between -mx-6 -mt-6 mb-6">
+              <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" /><h3 className="font-bold text-white text-xs uppercase tracking-widest">Candidate View</h3></div>
             </div>
 
-            <div className="p-6">
-              {/* Company Header */}
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-200">
-                  CV
-                </div>
-                <div>
-                  <h4 className="font-black text-slate-900 text-lg leading-tight">{jobTitle || 'Job Title'}</h4>
-                  <p className="text-sm text-blue-600 font-semibold">{dept} Department · <span className="text-slate-400">CVNet Corp</span></p>
-                </div>
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400"><Briefcase size={20}/></div>
+              <div>
+                <h4 className="font-black text-slate-900 text-lg leading-tight">{jobTitle || 'Select Job Title'}</h4>
+                <p className="text-sm text-blue-600 font-semibold">{currentDepartmentName}</p>
               </div>
+            </div>
 
-              {/* Quick Info Tags */}
-              <div className="flex flex-wrap gap-2 mb-6">
-                <span className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 text-slate-600 text-[11px] font-bold px-3 py-1.5 rounded-xl">
-                  <MapPin size={12} className="text-blue-500" /> {location || 'Remote'}
-                </span>
-                <span className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 text-slate-600 text-[11px] font-bold px-3 py-1.5 rounded-xl">
-                  <DollarSign size={12} className="text-green-500" /> ${salaryMin} – ${salaryMax}
-                </span>
-                <span className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 text-slate-600 text-[11px] font-bold px-3 py-1.5 rounded-xl">
-                  <Eye size={12} className="text-indigo-500" /> {expLevel.split(' ')[0]}
-                </span>
-              </div>
+            <div className="flex flex-wrap gap-2 mb-6">
+              {location && <span className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 text-slate-600 text-[11px] font-bold px-3 py-1.5 rounded-xl"><MapPin size={12}/> {location}</span>}
+              <span className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 text-slate-600 text-[11px] font-bold px-3 py-1.5 rounded-xl"><Briefcase size={12}/> {employmentType.replace('_', ' ')}</span>
+              {salaryRange && <span className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 text-slate-600 text-[11px] font-bold px-3 py-1.5 rounded-xl"><Banknote size={12}/> {selectedCurrencySymbol} {salaryRange}</span>}
+            </div>
 
-              {/* Description Snippet */}
-              <div className="mb-6">
-                <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Overview</h5>
-                <p className="text-sm text-slate-600 leading-relaxed line-clamp-4 italic">
-                  "{description || 'Enter a description to see it here...'}"
-                </p>
-              </div>
-
-              {/* Skills & Benefits */}
-              <div className="space-y-4 mb-8">
-                <div>
-                  <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Top Skills Required</h5>
-                  <div className="flex flex-wrap gap-1.5">
-                    {skills.length > 0 ? skills.slice(0, 4).map(s => (
-                      <span key={s} className="text-[10px] bg-slate-900 text-white font-bold px-2.5 py-1 rounded-lg">{s}</span>
-                    )) : <span className="text-xs text-slate-300">No skills added</span>}
-                    {skills.length > 4 && <span className="text-[10px] text-slate-400 font-bold px-1">+ {skills.length - 4} more</span>}
+            <div className="mb-6">
+              <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Requirements</h5>
+              
+              {/* ✅ RESTORED: Responsibilities Preview */}
+              {responsibilities && (
+                <div className="mb-4">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-2">
+                    <ListChecks size={14} className="text-blue-500" /> Day-to-Day Responsibilities
                   </div>
+                  <p className="text-xs text-slate-600 whitespace-pre-line leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    {responsibilities}
+                  </p>
                 </div>
+              )}
 
-                {benefits.length > 0 && (
-                  <div>
-                    <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Key Benefits</h5>
-                    <div className="flex flex-wrap gap-1.5">
-                      {benefits.slice(0, 3).map(b => (
-                        <span key={b} className="text-[10px] bg-green-50 text-green-700 border border-green-100 font-bold px-2.5 py-1 rounded-lg">✓ {b}</span>
-                      ))}
+              {expLevelName && (
+                <div className="text-xs font-semibold text-slate-600 flex justify-between bg-slate-50 p-2 rounded-lg border border-slate-100 mb-2">
+                  <span>{expLevelName}</span><span>{expMinYears} {expMaxYears > 0 ? `- ${expMaxYears}` : '+'} Yrs</span>
+                </div>
+              )}
+              
+              {educations.length > 0 && (
+                <div className="mt-3 space-y-1">
+                  {educations.map((deg, i) => (
+                    <div key={i} className="flex items-start gap-1.5 text-xs font-semibold text-slate-600 bg-indigo-50 p-2 rounded-lg border border-indigo-100">
+                      <GraduationCap size={14} className="text-indigo-500 mt-0.5" />
+                      <span className="leading-tight">{deg}</span>
                     </div>
-                  </div>
-                )}
+                  ))}
+                </div>
+              )}
+              
+              <div className="flex flex-wrap gap-1.5 mt-3">
+                {skills.filter(s => s.isVisible).length > 0 ? skills.filter(s => s.isVisible).map(s => (
+                  <span key={s.name} className="text-[10px] bg-slate-900 text-white font-bold px-2 py-1 rounded-md">
+                    {s.name} 
+                    {s.showLevel && <span className="text-[9px] text-slate-400 ml-1">({s.level})</span>}
+                  </span>
+                )) : <span className="text-xs text-slate-300">No public skills requested</span>}
               </div>
-
-              <button className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-slate-200 active:scale-[0.98]">
-                Apply for this position
-              </button>
-
-              <p className="text-center text-[10px] text-slate-400 mt-4 font-medium flex items-center justify-center gap-1.5">
-                Not visible until published
-              </p>
             </div>
+
+            <button disabled className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl opacity-50">Apply for position</button>
+            <p className="text-center text-[10px] text-slate-400 mt-3 font-medium flex items-center justify-center gap-1.5"><Calendar size={10}/> Deadline: {applicationDeadline}</p>
           </div>
         </div>
       </div>

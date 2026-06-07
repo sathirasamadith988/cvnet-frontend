@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Home,
   LayoutDashboard,
@@ -14,7 +14,10 @@ import {
   Settings,
   Menu,
   X,
+  LogOut,
 } from "lucide-react";
+import { auth } from "@/lib/firebaseConfig";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 
 const navItems = [
   { href: "/recruiter/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -26,9 +29,51 @@ const navItems = [
 
 export default function RecruiterSidebar() {
   const pathname = usePathname();
+  const router = useRouter(); // ✅ Added router for logout redirect
   const [isOpen, setIsOpen] = useState(false);
+  
+  // Dynamic User State
+  const [userName, setUserName] = useState("CVNet Enterprise"); 
+  const [userPhoto, setUserPhoto] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Listen for Firebase Auth updates to instantly sync the profile image and name
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        if (user.displayName) setUserName(user.displayName);
+        if (user.photoURL) setUserPhoto(user.photoURL);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const toggleSidebar = () => setIsOpen(!isOpen);
+
+  // Helper to generate initials (e.g., "Niranga Kumara" -> "NK")
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .substring(0, 2)
+      .toUpperCase();
+  };
+
+  // ✅ SECURE LOGOUT ROUTINE
+  const handleLogout = async () => {
+    try {
+      // 1. Terminate Firebase Client Session
+      await signOut(auth);
+
+      // 2. Destroy the middleware authentication cookie
+      document.cookie = "cvnet_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+
+      // 3. Redirect back to the login page
+      router.push("/login");
+    } catch (error) {
+      console.error("Failed to log out cleanly:", error);
+    }
+  };
 
   return (
     <>
@@ -83,19 +128,6 @@ export default function RecruiterSidebar() {
           </div>
         </div>
 
-        {/* Home link */}
-        <div className="px-3 py-4 border-b border-slate-800 lg:mt-0 mt-20">
-          <Link
-            href="/"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-slate-400 hover:bg-slate-800 hover:text-white transition-all group"
-          >
-            <div className="p-2 rounded-lg bg-slate-800 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-              <Home size={18} />
-            </div>
-            Home Portal
-          </Link>
-        </div>
-
         {/* Navigation */}
         <nav className="flex-1 px-3 py-6 overflow-y-auto">
           <ul className="space-y-2">
@@ -122,7 +154,8 @@ export default function RecruiterSidebar() {
         </nav>
 
         {/* Bottom Section */}
-        <div className="mt-auto border-t border-slate-800 p-4 space-y-4">
+        <div className="mt-auto border-t border-slate-800 p-4 space-y-2">
+          
           <Link
             href="/recruiter/settings"
             onClick={() => setIsOpen(false)}
@@ -136,13 +169,31 @@ export default function RecruiterSidebar() {
             Settings
           </Link>
 
-          <div className="flex items-center gap-3 px-2 py-3 bg-slate-800/50 rounded-2xl border border-slate-800">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-sm shadow-inner">
-              AM
-            </div>
+          {/* ✅ LOGOUT BUTTON */}
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-bold text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 transition-all mb-2"
+          >
+            <LogOut size={18} />
+            Logout
+          </button>
+
+          {/* DYNAMIC USER PROFILE */}
+          <div className="flex items-center gap-3 px-2 py-3 bg-slate-800/50 rounded-2xl border border-slate-800 mt-2">
+            {userPhoto ? (
+              <img 
+                src={userPhoto} 
+                alt={userName} 
+                className="w-10 h-10 rounded-xl object-cover shadow-inner border border-slate-700"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-sm shadow-inner">
+                {getInitials(userName)}
+              </div>
+            )}
             <div className="min-w-0">
-              <p className="text-white text-xs font-black truncate leading-tight">Alex Morgan</p>
-              <p className="text-slate-500 text-[10px] font-bold uppercase truncate">Admin</p>
+              <p className="text-white text-xs font-black truncate leading-tight">{userName}</p>
+              <p className="text-slate-500 text-[10px] font-bold uppercase truncate">Company</p>
             </div>
           </div>
         </div>
