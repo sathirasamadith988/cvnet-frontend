@@ -29,7 +29,7 @@ export default function LoginPage() {
     return errorStr || "An unexpected error occurred during authentication. Please try again.";
   };
 
-  // ✅ NEW: Read Firestore Role and route dynamically
+  // ✅ ROUTING FIX: Uses the exact URLs for each role
   const routeUserBasedOnRole = async (uid: string) => {
     try {
       const userDocRef = doc(db, "users", uid);
@@ -37,16 +37,28 @@ export default function LoginPage() {
       
       const role = userDocSnap.exists() ? userDocSnap.data().role : "candidate";
 
+      // 1. Refresh/Ensure the auth token is saved in the cookie
+      const token = await auth.currentUser?.getIdToken();
+      if (token) {
+        document.cookie = `cvnet_token=${token}; path=/; max-age=604800`; // 7 day expiry
+      }
+
+      // 2. Save the role to the cookie for proxy.ts to read
+      document.cookie = `cvnet_role=${role}; path=/; max-age=604800`;
+
+      // 3. Route to the exact correct landing pages
       if (role === "admin") {
         window.location.href = "/admin/users"; 
       } else if (role === "company") {
         window.location.href = "/recruiter/dashboard"; 
       } else {
-        window.location.href = "/dashboard"; 
+        // Fallback for candidate
+        window.location.href = "/applications"; 
       }
     } catch (error) {
-      console.error("Failed to fetch role, defaulting:", error);
-      window.location.href = "/dashboard";
+      console.error("Failed to fetch role, defaulting to candidate:", error);
+      document.cookie = `cvnet_role=candidate; path=/; max-age=604800`;
+      window.location.href = "/applications";
     }
   };
 
