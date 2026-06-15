@@ -6,8 +6,8 @@ import { useState } from "react";
 import { Eye, EyeOff, Mail, Lock, AlertCircle } from "lucide-react";
 import { authService } from "@/services/authService";
 import { useRouter } from "next/navigation";
-import { auth, db } from "@/lib/firebaseConfig"; // Added db
-import { doc, getDoc } from "firebase/firestore"; // Added Firestore methods
+import { auth, db } from "@/lib/firebaseConfig"; 
+import { doc, getDoc } from "firebase/firestore"; 
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -29,36 +29,45 @@ export default function LoginPage() {
     return errorStr || "An unexpected error occurred during authentication. Please try again.";
   };
 
-  // ✅ ROUTING FIX: Uses the exact URLs for each role
   const routeUserBasedOnRole = async (uid: string) => {
     try {
-      const userDocRef = doc(db, "users", uid);
-      const userDocSnap = await getDoc(userDocRef);
+      let userDocRef = doc(db, "users", uid);
+      let userDocSnap = await getDoc(userDocRef);
       
-      const role = userDocSnap.exists() ? userDocSnap.data().role : "candidate";
-
-      // 1. Refresh/Ensure the auth token is saved in the cookie
-      const token = await auth.currentUser?.getIdToken();
-      if (token) {
-        document.cookie = `cvnet_token=${token}; path=/; max-age=604800`; // 7 day expiry
+      // Fallback for uppercase table name
+      if (!userDocSnap.exists()) {
+        userDocRef = doc(db, "Users", uid);
+        userDocSnap = await getDoc(userDocRef);
+      }
+      
+      // 🔥 THE FIX: If the document exists but 'role' is empty, safely default to "candidate"
+      let role = "candidate"; 
+      if (userDocSnap.exists() && userDocSnap.data().role) {
+        // Convert to lowercase so "Company", "COMPANY", and "company" all work perfectly
+        role = userDocSnap.data().role.toLowerCase().trim();
       }
 
-      // 2. Save the role to the cookie for proxy.ts to read
+      // 1. Ensure the auth token is refreshed and saved
+      const token = await auth.currentUser?.getIdToken(true); 
+      if (token) {
+        document.cookie = `cvnet_token=${token}; path=/; max-age=604800`; 
+      }
+
+      // 2. Save the SAFE role to the cookie
       document.cookie = `cvnet_role=${role}; path=/; max-age=604800`;
 
-      // 3. Route to the exact correct landing pages
+      // 3. Route the user accurately
       if (role === "admin") {
         window.location.href = "/admin/users"; 
-      } else if (role === "company") {
+      } else if (role === "company" || role === "recruiter") {
         window.location.href = "/recruiter/dashboard"; 
       } else {
-        // Fallback for candidate
         window.location.href = "/applications"; 
       }
     } catch (error) {
       console.error("Failed to fetch role, defaulting to candidate:", error);
       document.cookie = `cvnet_role=candidate; path=/; max-age=604800`;
-      window.location.href = "/applications";
+      window.location.href = "/dashboard"; 
     }
   };
 
@@ -69,18 +78,14 @@ export default function LoginPage() {
 
     try {
       await authService.login(email, password);
-      // Wait for Firebase to register the user context, then route
+      
+      // ✅ FIX: Rely directly on Firebase's global auth state
       if (auth.currentUser) {
         await routeUserBasedOnRole(auth.currentUser.uid);
       } else {
-        window.location.href = "/dashboard";
+         window.location.href = "/applications";
       }
     } catch (error: any) {
-      if (auth.currentUser || document.cookie.includes("cvnet_token")) {
-        if (auth.currentUser) await routeUserBasedOnRole(auth.currentUser.uid);
-        else window.location.href = "/dashboard";
-        return;
-      }
       const rawMessage = error.response?.data?.error || error.message;
       setErrorMessage(getFriendlyMessage(rawMessage));
       setIsLoading(false);
@@ -93,17 +98,14 @@ export default function LoginPage() {
 
     try {
       await authService.loginWithGoogle();
+      
+      // ✅ FIX: Rely directly on Firebase's global auth state
       if (auth.currentUser) {
         await routeUserBasedOnRole(auth.currentUser.uid);
       } else {
-        window.location.href = "/dashboard";
+        window.location.href = "/applications";
       }
     } catch (error: any) {
-      if (auth.currentUser || document.cookie.includes("cvnet_token")) {
-        if (auth.currentUser) await routeUserBasedOnRole(auth.currentUser.uid);
-        else window.location.href = "/dashboard";
-        return;
-      }
       const rawMessage = error.response?.data?.error || error.message;
       setErrorMessage(getFriendlyMessage(rawMessage || "Google Auth Failed"));
       setIsLoading(false);
