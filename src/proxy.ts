@@ -1,15 +1,22 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// ✅ FIX: Renamed back to "proxy" to satisfy your Next.js configuration
-export function proxy(request: NextRequest) {
+export default function proxy(request: NextRequest) {
   const token = request.cookies.get("cvnet_token")?.value;
   const { pathname } = request.nextUrl;
 
-  // 1. DYNAMIC CONSOLE LOGGING
   console.log("==================================================");
   console.log("🛡️  PROXY INTERCEPTED URL PATH:", pathname);
   console.log("🍪 AUTH COOKIE FOUND?:", token ? "YES (Token is present)" : "NO COOKIE FOUND");
+
+  // 1. 🔥 ISOLATED PORTAL BYPASS (The Judge Board) 🔥
+  // If the URL starts with /board/, we completely skip the login check.
+  // Anyone can open the page, and the backend PIN system will handle the security.
+  if (pathname.startsWith("/board/")) {
+    console.log("⚖️  JUDGE BOARD ACCESS: Bypassing login. Backend PIN will secure this.");
+    console.log("==================================================");
+    return NextResponse.next();
+  }
 
   // 2. DEFINE EXPLICIT PUBLIC ENTRIES
   const publicRoutes = ["/login", "/signup", "/"];
@@ -36,7 +43,6 @@ export function proxy(request: NextRequest) {
   return NextResponse.next();
 }
 
-// 5. GLOBAL MATCHER SYSTEM
 export const config = {
   matcher: [
     /*
