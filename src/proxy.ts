@@ -3,58 +3,73 @@ import type { NextRequest } from "next/server";
 
 export default function proxy(request: NextRequest) {
   const token = request.cookies.get("cvnet_token")?.value;
-  const role = request.cookies.get("cvnet_role")?.value; // 'company', 'candidate', or 'admin'
-  const { pathname } = request.nextUrl;
+  const rawRole = request.cookies.get("cvnet_role")?.value; 
+  
+  // 🔥 FIX 1: Handle the literal string "undefined" or "null" safely
+  let role = rawRole ? rawRole.toLowerCase().trim() : null;
+  if (role === "undefined" || role === "null" || role === "") {
+    role = null;
+  }
+
+  const path = request.nextUrl.pathname.toLowerCase();
 
   console.log("==================================================");
-  console.log(`🛡️ PROXY INTERCEPT: ${pathname} | ROLE: ${role || "NONE"}`);
+  console.log(`🛡️ PROXY INTERCEPT: ${path} | ROLE: ${role || "NONE"}`);
 
-  // 1. 🔥 ISOLATED PORTAL BYPASS (The Judge Board)
-  if (pathname.startsWith("/board/")) {
+  // 1. ISOLATED PORTAL BYPASS (The Judge Board)
+  if (path.startsWith("/board/")) {
     return NextResponse.next();
   }
 
   const publicRoutes = ["/login", "/signup", "/"];
-  const isPublicRoute = publicRoutes.includes(pathname);
+  const isPublicRoute = publicRoutes.includes(path);
 
-  // 2. ENFORCE AUTHENTICATION (Must be logged in)
+  // 2. 🔥 FIX 2: THE KILL SWITCH FOR CORRUPT SESSIONS 🔥
+  // We moved this UP. If you have a token but your role is broken ("undefined"), 
+  // we delete the bad cookies and force you back to login to start fresh.
+  if (!isPublicRoute && token && !role) {
+    console.log("⚠️ CORRUPT SESSION DETECTED: Destroying bad cookies and forcing re-login.");
+    const response = NextResponse.redirect(new URL("/login", request.url));
+    response.cookies.delete("cvnet_token");
+    response.cookies.delete("cvnet_role");
+    return response;
+  }
+
+  // 3. ENFORCE AUTHENTICATION (Must be logged in)
   if (!isPublicRoute && !token) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // 3. SESSION LOCK (Keep logged-in users away from /login)
+  // 4. SESSION LOCK (Keep logged-in users away from /login)
   if (isPublicRoute && token && role) {
     if (role === "admin") return NextResponse.redirect(new URL("/admin/users", request.url));
-    if (role === "company") return NextResponse.redirect(new URL("/recruiter/dashboard", request.url));
+    if (role === "company" || role === "recruiter") return NextResponse.redirect(new URL("/recruiter/dashboard", request.url));
     return NextResponse.redirect(new URL("/applications", request.url));
   }
 
-  // 4. 🚨 STRICT ROLE-BASED ACCESS CONTROL (RBAC) 🚨
+  // 5. STRICT "DEFAULT DENY" ROLE-BASED ACCESS CONTROL
   if (!isPublicRoute && token && role) {
     
-    // RULE A: Companies are ONLY allowed in /recruiter/
-    if (role === "company" && !pathname.startsWith("/recruiter")) {
-      console.log("🚨 INTRUSION BLOCKED: Company user strayed out of bounds.");
-      return NextResponse.redirect(new URL("/recruiter/dashboard", request.url));
+    // RULE A: Protect Admin Routes
+    if (path.startsWith("/admin") && role !== "admin") {
+      console.log("🚨 BLOCKED: Non-admin tried to access /admin");
+      const fallback = (role === "company" || role === "recruiter") ? "/recruiter/dashboard" : "/applications";
+      return NextResponse.redirect(new URL(fallback, request.url));
     }
 
-    // RULE B: Admins are ONLY allowed in /admin/
-    if (role === "admin" && !pathname.startsWith("/admin")) {
-      console.log("🚨 INTRUSION BLOCKED: Admin user strayed out of bounds.");
-      return NextResponse.redirect(new URL("/admin/users", request.url));
+    // RULE B: Protect Recruiter Routes
+    if (path.startsWith("/recruiter") && role !== "company" && role !== "recruiter") {
+      console.log("🚨 BLOCKED: Non-company tried to access /recruiter");
+      const fallback = role === "admin" ? "/admin/users" : "/applications";
+      return NextResponse.redirect(new URL(fallback, request.url));
     }
 
-    // RULE C: Candidates are NOT allowed in /admin/ or /recruiter/
-    if (role === "candidate" && (pathname.startsWith("/admin") || pathname.startsWith("/recruiter"))) {
-      console.log("🚨 INTRUSION BLOCKED: Candidate attempted to access privileged area.");
-      return NextResponse.redirect(new URL("/applications", request.url));
+    // RULE C: Protect Candidate Routes
+    if (!path.startsWith("/admin") && !path.startsWith("/recruiter") && role !== "candidate") {
+      console.log("🚨 BLOCKED: Admin/Company tried to access Candidate area");
+      const fallback = role === "admin" ? "/admin/users" : "/recruiter/dashboard";
+      return NextResponse.redirect(new URL(fallback, request.url));
     }
-  }
-
-  // 5. CORRUPT SESSION CATCH
-  if (!isPublicRoute && token && !role) {
-    console.log("⚠️ CORRUPT SESSION: Token exists but no role cookie. Forcing re-login.");
-    return NextResponse.redirect(new URL("/login", request.url));
   }
 
   return NextResponse.next();
