@@ -1,51 +1,27 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Search, SlidersHorizontal, Plus, ChevronDown } from 'lucide-react';
+import { Search, SlidersHorizontal, Plus, ChevronDown, Briefcase, Loader2 } from 'lucide-react';
+import axios from 'axios';
+import { auth } from '@/lib/firebaseConfig';
 
-const candidates = [
-  {
-    initials: 'SJ', name: 'Sarah Jenkins', email: 'sarah.j@example.com',
-    skills: ['Product Design', 'Figma', '+3 more'], experience: '6 Years',
-    match: 95, status: 'Interview', bg: 'bg-blue-100', text: 'text-blue-700',
-  },
-  {
-    initials: 'MC', name: 'Michael Chen', email: 'm.chen@dev.io',
-    skills: ['Python', 'Django', 'PostgreSQL'], experience: '4 Years',
-    match: 88, status: 'Technical Test', bg: 'bg-violet-100', text: 'text-violet-700',
-  },
-  {
-    initials: 'DR', name: 'David Ross', email: 'd.ross@mail.com',
-    skills: ['Data Science', 'Python'], experience: '3 Years',
-    match: 82, status: 'Screening', bg: 'bg-emerald-100', text: 'text-emerald-700',
-  },
-  {
-    initials: 'AL', name: 'Amanda Lee', email: 'amanda.l@design.co',
-    skills: ['UX Research', 'Wireframing'], experience: '5 Years',
-    match: 65, status: 'Applied', bg: 'bg-amber-100', text: 'text-amber-700',
-  },
-  {
-    initials: 'JW', name: 'James Wilson', email: 'j.wilson@tech.net',
-    skills: ['Java', 'Spring Boot', '+2 more'], experience: '8 Years',
-    match: 78, status: 'Applied', bg: 'bg-blue-100', text: 'text-blue-700',
-  },
-  {
-    initials: 'EP', name: 'Emma Parker', email: 'emma.p@marketing.io',
-    skills: ['SEO', 'Content'], experience: '2 Years',
-    match: 45, status: 'Rejected', bg: 'bg-rose-100', text: 'text-rose-700',
-  },
-];
+interface Candidate {
+  appId: string;
+  userId: string;
+  fullName: string;
+  email: string;
+  profileImageUrl: string | null;
+  jobTitle: string;
+  industryScore: number;
+  status: string;
+  skills: string[];
+}
 
-const matchRanges = [
-  { label: '90% - 100%', count: 12 },
-  { label: '80% - 89%', count: 24 },
-  { label: '70% - 79%', count: 45 },
-  { label: '< 70%', count: 156 },
-];
-
-const filterSkills = ['Python', 'React', 'Figma', 'SQL', 'Marketing'];
-const filterLocations = ['San Francisco, CA', 'New York, NY', 'London, UK', 'Remote'];
+interface JobFilter {
+  id: string;
+  title: string;
+}
 
 const statusConfig: Record<string, string> = {
   Interview: 'bg-blue-100 text-blue-700',
@@ -53,86 +29,140 @@ const statusConfig: Record<string, string> = {
   Screening: 'bg-amber-100 text-amber-700',
   Applied: 'bg-slate-100 text-slate-600',
   Rejected: 'bg-red-100 text-red-700',
+  Pending: 'bg-amber-100 text-amber-700',
+};
+
+const getInitials = (name: string) => {
+  if (!name) return '??';
+  return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 };
 
 export default function CandidatesPage() {
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [jobs, setJobs] = useState<JobFilter[]>([]);
   const [search, setSearch] = useState('');
-  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [selectedJobId, setSelectedJobId] = useState<string>('');
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [loading, setLoading] = useState(true);
+  const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
 
-  const filtered = candidates.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.email.toLowerCase().includes(search.toLowerCase())
-  );
+  // 1. Fetch Jobs for the Filter Sidebar
+  const fetchJobs = async () => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const token = await user.getIdToken();
+      
+      const res = await axios.get('http://localhost:5167/api/candidates/jobs', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setJobs(res.data);
+    } catch (err) {
+      console.error("Failed to fetch jobs", err);
+    }
+  };
 
-  const toggleSkill = (skill: string) =>
-    setSelectedSkills(s => s.includes(skill) ? s.filter(x => x !== skill) : [...s, skill]);
+  // 2. Fetch Candidates dynamically based on filters
+  const fetchCandidates = async () => {
+    setLoading(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const token = await user.getIdToken();
+
+      const queryParams = new URLSearchParams();
+      if (selectedJobId) queryParams.append('jobId', selectedJobId);
+      if (search) queryParams.append('search', search);
+      queryParams.append('sortOrder', sortOrder);
+
+      const res = await axios.get(`http://localhost:5167/api/candidates?${queryParams.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setCandidates(res.data);
+    } catch (err) {
+      console.error("Failed to fetch candidates", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Wait for Firebase Auth before making the initial fetch
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged(user => { 
+      if (user) {
+        fetchJobs();
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // Trigger candidate fetch when filters change (with debounce)
+  useEffect(() => {
+    const debounce = setTimeout(() => {
+      // Only fetch if auth is ready
+      if (auth.currentUser) {
+        fetchCandidates();
+      }
+    }, 300);
+
+    return () => clearTimeout(debounce);
+  }, [selectedJobId, search, sortOrder]);
 
   return (
-    <div className="p-6 sm:p-8 max-w-7xl">
+    <div className="p-6 sm:p-8 max-w-7xl mx-auto min-h-screen">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Candidates Directory</p>
           <h1 className="text-2xl font-extrabold text-slate-900">Candidates</h1>
         </div>
-        <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors">
-          <Plus size={15} /> Add Candidate
-        </button>
       </div>
 
-      <div className="flex gap-6">
+      <div className="flex flex-col lg:flex-row gap-6">
+        
         {/* Filters Sidebar */}
-        <div className="hidden lg:block w-56 flex-shrink-0 space-y-5">
-          <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+        <div className="hidden lg:block w-64 flex-shrink-0 space-y-5">
+          <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm sticky top-6">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-bold text-slate-800">Filters</h3>
-              <button className="text-xs text-blue-600 font-semibold hover:text-blue-700">Clear all</button>
+              <button 
+                onClick={() => { setSelectedJobId(''); setSearch(''); }}
+                className="text-xs text-blue-600 font-semibold hover:text-blue-700"
+              >
+                Clear all
+              </button>
             </div>
 
-            <div className="mb-4">
-              <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Match Percentage</h4>
-              <div className="space-y-1">
-                {matchRanges.map(({ label, count }) => (
-                  <label key={label} className="flex items-center justify-between py-1 cursor-pointer">
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
-                      <span className="text-xs text-slate-600">{label}</span>
-                    </div>
-                    <span className="text-xs text-slate-400">{count}</span>
+            {/* Filter by Job Post */}
+            <div className="mb-4 pt-2">
+              <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Filter by Job Post</h4>
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                <label className="flex items-start gap-3 cursor-pointer group">
+                  <input 
+                    type="radio" 
+                    name="jobFilter" 
+                    checked={selectedJobId === ''} 
+                    onChange={() => setSelectedJobId('')}
+                    className="mt-0.5 w-4 h-4 rounded-full border-slate-300 text-blue-600 focus:ring-blue-500" 
+                  />
+                  <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">All Jobs</span>
+                </label>
+                
+                {jobs.map(job => (
+                  <label key={job.id} className="flex items-start gap-3 cursor-pointer group">
+                    <input 
+                      type="radio" 
+                      name="jobFilter" 
+                      value={job.id}
+                      checked={selectedJobId === job.id}
+                      onChange={(e) => setSelectedJobId(e.target.value)}
+                      className="mt-0.5 w-4 h-4 rounded-full border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0" 
+                    />
+                    <span className="text-sm font-medium text-slate-600 group-hover:text-blue-600 transition-colors line-clamp-2 leading-tight">
+                      {job.title}
+                    </span>
                   </label>
                 ))}
-              </div>
-            </div>
-
-            <div className="mb-4 pt-4 border-t border-slate-100">
-              <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Skills</h4>
-              <div className="relative mb-2">
-                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input placeholder="Find skill..." className="w-full pl-7 pr-2 py-1.5 text-xs border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:ring-1 focus:ring-blue-500" />
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {filterSkills.map(skill => (
-                  <button key={skill} onClick={() => toggleSkill(skill)} className={`text-xs px-2 py-1 rounded-full border transition-colors ${selectedSkills.includes(skill) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'}`}>{skill}</button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mb-4 pt-4 border-t border-slate-100">
-              <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Location</h4>
-              {filterLocations.map(loc => (
-                <label key={loc} className="flex items-center gap-2 py-0.5 cursor-pointer">
-                  <input type="checkbox" className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
-                  <span className="text-xs text-slate-600">{loc}</span>
-                </label>
-              ))}
-            </div>
-
-            <div className="pt-4 border-t border-slate-100">
-              <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Experience</h4>
-              <div className="flex gap-2">
-                <input placeholder="Min" className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                <span className="text-xs text-slate-400 self-center">–</span>
-                <input placeholder="Max" className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500" />
               </div>
             </div>
           </div>
@@ -141,90 +171,112 @@ export default function CandidatesPage() {
         {/* Candidates List */}
         <div className="flex-1">
           {/* Search + Sort */}
-          <div className="flex items-center gap-3 mb-4">
-            <div className="relative flex-1 max-w-xs">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <div className="flex items-center gap-3 mb-6">
+            <div className="relative flex-1 max-w-md">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Search by name, email..."
-                className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Search candidates by name or email..."
+                className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
               />
             </div>
             <div className="relative">
               <select 
-                aria-label="Sort candidates"
-                className="appearance-none pl-3 pr-8 py-2 text-sm border border-slate-200 rounded-xl bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
+                className="appearance-none pl-4 pr-10 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-700 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-sm"
               >
-                <option>Match Score</option>
-                <option>Experience</option>
-                <option>Name A-Z</option>
+                <option value="desc">Highest Match Score</option>
+                <option value="asc">Lowest Match Score</option>
+                <option value="gpa_desc">Highest GPA</option> 
+                <option value="gpa_asc">Lowest GPA</option>
               </select>
-              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
-            <button 
-              aria-label="Filter candidates"
-              className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors lg:hidden"
-            >
-              <SlidersHorizontal size={16} className="text-slate-600" />
-            </button>
           </div>
 
-          <p className="text-xs text-slate-400 mb-4">Showing {filtered.length} of 237 candidates</p>
-
-          <div className="space-y-3">
-            {filtered.map(({ initials, name, email, skills, experience, match, status, bg, text }) => (
-              <div key={email} className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between flex-wrap gap-3">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-full ${bg} ${text} flex items-center justify-center text-sm font-bold flex-shrink-0`}>
-                      {initials}
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-900">{name}</p>
-                      <p className="text-xs text-slate-400">{email}</p>
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {skills.map(s => (
-                          <span key={s} className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{s}</span>
-                        ))}
+          {loading ? (
+            <div className="flex justify-center items-center py-20">
+              <Loader2 className="animate-spin text-blue-600" size={40} />
+            </div>
+          ) : candidates.length === 0 ? (
+            <div className="bg-white border border-slate-100 rounded-2xl p-12 text-center shadow-sm border-dashed">
+              <Search size={32} className="text-slate-300 mx-auto mb-4" />
+              <p className="text-slate-800 font-bold text-lg mb-1">No candidates found</p>
+              <p className="text-slate-500 text-sm">Try adjusting your search or selecting a different job post.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-xs text-slate-500 font-bold mb-4">
+                Showing {candidates.length} candidate{candidates.length !== 1 && 's'}
+              </p>
+              
+              {candidates.map((c) => (
+                <div key={c.appId} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all hover:border-blue-300">
+                  <div className="flex flex-col sm:flex-row items-start justify-between gap-5">
+                    
+                    {/* Identity */}
+                    <div className="flex items-start gap-4 flex-1">
+                      {c.profileImageUrl ? (
+                        <img src={c.profileImageUrl} alt={c.fullName} className="w-14 h-14 rounded-full object-cover shadow-sm border border-slate-100 shrink-0" />
+                      ) : (
+                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-xl shrink-0 shadow-inner">
+                          {getInitials(c.fullName)}
+                        </div>
+                      )}
+                      
+                      <div>
+                        <div className="flex items-center gap-3 mb-1">
+                          <p className="font-extrabold text-slate-900 text-lg">{c.fullName}</p>
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${statusConfig[c.status] || statusConfig.Pending}`}>
+                            {c.status}
+                          </span>
+                        </div>
+                        <p className="text-sm font-bold text-blue-600 mb-2">{c.jobTitle}</p>
+                        <p className="text-xs font-semibold text-slate-500 mb-3">{c.email}</p>
+                        
+                        {/* Skills */}
+                        {c.skills && c.skills.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {c.skills.map((skill, idx) => (
+                              <span key={idx} className="bg-slate-50 border border-slate-100 text-[10px] font-bold px-2.5 py-1 rounded-lg text-slate-600">
+                                {skill}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-6 flex-wrap">
-                    <div className="text-center">
-                      <p className="text-xs text-slate-400">Experience</p>
-                      <p className="text-sm font-bold text-slate-900">{experience}</p>
+
+                    {/* Score & Action */}
+                    <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-4 w-full sm:w-auto border-t sm:border-t-0 border-slate-100 pt-4 sm:pt-0">
+                      <div className="flex items-center gap-3">
+                        <div className="text-right hidden sm:block">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Match Score</p>
+                        </div>
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-lg shadow-sm border
+                          ${c.industryScore >= 70 ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 
+                            c.industryScore >= 50 ? 'bg-amber-50 border-amber-100 text-amber-600' : 
+                            'bg-rose-50 border-rose-100 text-rose-600'}
+                        `}>
+                          {c.industryScore}%
+                        </div>
+                      </div>
+                      
+                      <Link
+                        href={`/recruiter/candidates/${c.appId}`}
+                        className="text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-600 hover:text-white px-5 py-2.5 rounded-xl transition-all border border-blue-200"
+                      >
+                        Review Profile
+                      </Link>
                     </div>
-                    <div className="text-center">
-                      <p className="text-xs text-slate-400">Match Score</p>
-                      <p className={`text-lg font-extrabold ${match >= 80 ? 'text-green-600' : match >= 60 ? 'text-amber-500' : 'text-red-500'}`}>{match}%</p>
-                    </div>
-                    <div>
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusConfig[status]}`}>{status}</span>
-                    </div>
-                    <Link
-                      href={`/recruiter/candidates/${email}`}
-                      className="text-xs font-semibold text-blue-600 hover:text-blue-700 border border-blue-200 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors"
-                    >
-                      View Profile
-                    </Link>
+
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Pagination */}
-          <div className="flex items-center justify-between mt-5">
-            <p className="text-xs text-slate-400">Showing {filtered.length} of 237</p>
-            <div className="flex gap-1">
-              <button className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50">Previous</button>
-              {[1, 2, 3].map(n => (
-                <button key={n} className={`px-3 py-1.5 text-xs rounded-lg ${n === 1 ? 'bg-blue-600 text-white' : 'border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>{n}</button>
               ))}
-              <button className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50">Next</button>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

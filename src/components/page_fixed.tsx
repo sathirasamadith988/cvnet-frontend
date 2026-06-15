@@ -31,7 +31,7 @@ type FullApplicantProfileDto = {
   email: string;
   phone?: string;
   profileImageUrl?: string;
-  gpa?: number | null;
+  
   jobRole: string;
   currentOrg?: string;
   currentPosition?: string;
@@ -84,21 +84,14 @@ const firstNonEmpty = (...values: unknown[]) => {
   return '';
 };
 
-// Fix 1: Handle when 'skill' is a pure string in Inline Quick-View mapping
-const getSkillName = (skill: any, index: number) => {
-  if (typeof skill === 'string') return skill;
-  return firstNonEmpty(skill?.skillName, skill?.skill_name, skill?.name, skill?.title, skill?.label, skill?.skill, skill?.domain) || `Skill ${index + 1}`;
-};
+const getSkillName = (skill: any, index: number) =>
+  firstNonEmpty(skill?.skillName, skill?.name, skill?.title, skill?.label, skill?.skill, skill?.domain) || `Skill ${index + 1}`;
 
-const getSkillLevel = (skill: any) => {
-  if (typeof skill === 'string') return 'Not specified';
-  return firstNonEmpty(skill?.level, skill?.proficiency, skill?.proficiencyLevel, skill?.experienceLevel) || 'Not specified';
-};
+const getSkillLevel = (skill: any) =>
+  firstNonEmpty(skill?.level, skill?.proficiency, skill?.proficiencyLevel, skill?.experienceLevel) || 'Not specified';
 
-const getLinkLabel = (link: any, index: number) => {
-  if (typeof link === 'string') return link;
-  return firstNonEmpty(link?.platformName, link?.platform_name, link?.platform, link?.name, link?.title, link?.label) || `Link ${index + 1}`;
-};
+const getLinkLabel = (link: any, index: number) =>
+  firstNonEmpty(link?.platformName, link?.platform, link?.name, link?.title, link?.label) || `Link ${index + 1}`;
 
 const normalizeTextList = (value: any) =>
   asArray(value).map((item) => (typeof item === 'string' ? item : firstNonEmpty(item?.name, item?.title, item?.label, item?.skillName, item?.degreeTitle, item?.organizationName, item?.role) || '')).filter(Boolean);
@@ -107,9 +100,8 @@ const normalizeProfile = (raw: any): FullApplicantProfileDto => ({
   appId: firstNonEmpty(raw?.appId, raw?.id),
   fullName: firstNonEmpty(raw?.fullName, raw?.name, raw?.displayName, raw?.candidateName),
   email: firstNonEmpty(raw?.email),
-  gpa: raw?.gpa ? Number(raw.gpa) : null,
   phone: firstNonEmpty(raw?.phone, raw?.phoneNumber),
-  profileImageUrl: firstNonEmpty(raw?.profileImageUrl, raw?.profile_image_url, raw?.photoUrl, raw?.avatarUrl),
+  profileImageUrl: firstNonEmpty(raw?.profileImageUrl, raw?.photoUrl, raw?.avatarUrl),
   jobRole: firstNonEmpty(raw?.jobRole, raw?.role, raw?.title),
   currentOrg: firstNonEmpty(raw?.currentOrg, raw?.currentOrganization, raw?.organization),
   currentPosition: firstNonEmpty(raw?.currentPosition, raw?.position, raw?.currentTitle),
@@ -134,6 +126,8 @@ const normalizeProfile = (raw: any): FullApplicantProfileDto => ({
   volunteers: asArray(raw?.volunteers ?? raw?.snapshotVolunteers ?? raw?.snapshot_volunteers),
   socialLinks: asArray(raw?.socialLinks ?? raw?.snapshotSocialLinks ?? raw?.snapshot_social_links),
 });
+
+
 // ─── ScoreRing ────────────────────────────────────────────────────────────────
 const ScoreRing = ({ score, label, colorClass, subLabel, dark = false }: ScoreRingProps) => {
   const radius = 36;
@@ -338,18 +332,6 @@ function FullProfileModal({ appId, jobId, onClose }: { appId: string; jobId: str
                     </div>
                   </div>
                 </div>
-                {data.gpa !== null && data.gpa !== undefined && data.gpa > 0 && (
-                    <div className="mt-5 grid gap-3">
-                      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">
-                        <Award size={12} /> Academic Excellence
-                      </div>
-                      <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-                        <span className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-4 py-2 text-xs font-extrabold text-violet-700 shadow-sm transition hover:bg-violet-100 hover:shadow-md">
-                          <GraduationCap size={13} /> GPA: {data.gpa.toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                  )}
 
                 {data.cvUrl && (
                   <a href={data.cvUrl} target="_blank" rel="noopener noreferrer"
@@ -522,19 +504,16 @@ function FullProfileModal({ appId, jobId, onClose }: { appId: string; jobId: str
                     {['publications','certifications','awards','languages','memberships','volunteers'].includes(activeTab) && (
                       <div className="grid gap-4 sm:grid-cols-2">
                         {asArray((data as any)[activeTab]).map((item: any, i: number) => {
-                          const title = firstNonEmpty(
-                            item?.title, 
-                            item?.field, 
-                            item?.awardName, 
-                            item?.award_name,
-                            item?.languageName, 
-                            item?.language_name,
-                            item?.organizationName, 
-                            item?.organization_name,
-                            item?.role, 
-                            item?.organization
-                          ) || `Item ${i + 1}`;
-                          const meta = firstNonEmpty(item?.issuer, item?.issuedBy, item?.organization, item?.organizationName);
+                          const title =
+                            firstNonEmpty(item?.title, item?.field, item?.awardName, item?.languageName, item?.organizationName, item?.role, item?.organization) ||
+                            `Item ${i + 1}`;
+                          const meta = firstNonEmpty(
+                            item?.organization,
+                            item?.proficiency,
+                            item?.field,
+                            item?.year ? `Year ${item.year}` : '',
+                            item?.issueDate ? formatMonthYear(item.issueDate) : ''
+                          );
                           return (
                             <div key={`${title}-${i}`} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
                               <div className="flex items-start justify-between gap-3">

@@ -6,10 +6,10 @@ import { useState } from "react";
 import { Eye, EyeOff, Mail, Lock, AlertCircle } from "lucide-react";
 import { authService } from "@/services/authService";
 import { useRouter } from "next/navigation";
-import { auth } from "@/lib/firebaseConfig"; // ✅ Added to check actual authentication state
+import { auth, db } from "@/lib/firebaseConfig"; // Added db
+import { doc, getDoc } from "firebase/firestore"; // Added Firestore methods
 
 export default function LoginPage() {
-  /* State Management */
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -18,27 +18,50 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const router = useRouter();
 
-  /**
-   * Translates internal technical exceptions into clean consumer warnings
-   */
   const getFriendlyMessage = (errorStr: string): string => {
     const cleanErr = errorStr.toLowerCase();
-    
     if (cleanErr.includes("invalid-credential") || cleanErr.includes("user-not-found") || cleanErr.includes("wrong-password")) {
       return "The email address or password you entered is incorrect. Please check your credentials and try again.";
     }
     if (cleanErr.includes("too-many-requests")) {
-      return "This account has been temporarily locked due to multiple failed login attempts. Please reset your password or try again later.";
-    }
-    if (cleanErr.includes("authentication failed") || cleanErr.includes("401")) {
-      return "Unable to synchronize your security session with our servers. If you haven't registered an account yet, please sign up first.";
+      return "This account has been temporarily locked. Please reset your password or try again later.";
     }
     return errorStr || "An unexpected error occurred during authentication. Please try again.";
   };
 
-  /**
-   * Handle Email/Password Login
-   */
+  // ✅ ROUTING FIX: Uses the exact URLs for each role
+  const routeUserBasedOnRole = async (uid: string) => {
+    try {
+      const userDocRef = doc(db, "users", uid);
+      const userDocSnap = await getDoc(userDocRef);
+      
+      const role = userDocSnap.exists() ? userDocSnap.data().role : "candidate";
+
+      // 1. Refresh/Ensure the auth token is saved in the cookie
+      const token = await auth.currentUser?.getIdToken();
+      if (token) {
+        document.cookie = `cvnet_token=${token}; path=/; max-age=604800`; // 7 day expiry
+      }
+
+      // 2. Save the role to the cookie for proxy.ts to read
+      document.cookie = `cvnet_role=${role}; path=/; max-age=604800`;
+
+      // 3. Route to the exact correct landing pages
+      if (role === "admin") {
+        window.location.href = "/admin/users"; 
+      } else if (role === "company") {
+        window.location.href = "/recruiter/dashboard"; 
+      } else {
+        // Fallback for candidate
+        window.location.href = "/applications"; 
+      }
+    } catch (error) {
+      console.error("Failed to fetch role, defaulting to candidate:", error);
+      document.cookie = `cvnet_role=candidate; path=/; max-age=604800`;
+      window.location.href = "/applications";
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -46,39 +69,41 @@ export default function LoginPage() {
 
     try {
       await authService.login(email, password);
-      // ✅ FIX 1: Hard redirect guarantees the middleware catches the newly set cookie immediately
-      window.location.href = "/dashboard"; 
-    } catch (error: any) {
-      // ✅ FIX 2: If Firebase successfully authenticated and set the token,
-      // bypass the false-positive backend sync error and proceed to the dashboard natively!
-      if (auth.currentUser || document.cookie.includes("cvnet_token")) {
+      // Wait for Firebase to register the user context, then route
+      if (auth.currentUser) {
+        await routeUserBasedOnRole(auth.currentUser.uid);
+      } else {
         window.location.href = "/dashboard";
+      }
+    } catch (error: any) {
+      if (auth.currentUser || document.cookie.includes("cvnet_token")) {
+        if (auth.currentUser) await routeUserBasedOnRole(auth.currentUser.uid);
+        else window.location.href = "/dashboard";
         return;
       }
-
-      const rawMessage = error.response?.data?.error || error.response?.data?.details || error.message;
+      const rawMessage = error.response?.data?.error || error.message;
       setErrorMessage(getFriendlyMessage(rawMessage));
       setIsLoading(false);
     }
   };
 
-  /**
-   * Handle Google Login
-   */
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     setErrorMessage(null);
 
     try {
       await authService.loginWithGoogle();
-      window.location.href = "/dashboard";
-    } catch (error: any) {
-      // ✅ FIX 2 APPLIED HERE AS WELL
-      if (auth.currentUser || document.cookie.includes("cvnet_token")) {
+      if (auth.currentUser) {
+        await routeUserBasedOnRole(auth.currentUser.uid);
+      } else {
         window.location.href = "/dashboard";
+      }
+    } catch (error: any) {
+      if (auth.currentUser || document.cookie.includes("cvnet_token")) {
+        if (auth.currentUser) await routeUserBasedOnRole(auth.currentUser.uid);
+        else window.location.href = "/dashboard";
         return;
       }
-      
       const rawMessage = error.response?.data?.error || error.message;
       setErrorMessage(getFriendlyMessage(rawMessage || "Google Auth Failed"));
       setIsLoading(false);
@@ -102,14 +127,9 @@ export default function LoginPage() {
             <span className="text-xl font-bold text-slate-900">CVNet</span>
           </Link>
 
-          <h1 className="text-2xl font-extrabold text-slate-900 mb-1">
-            Welcome Back
-          </h1>
-          <p className="text-slate-500 text-sm mb-8">
-            Log in to access your data analytics dashboard.
-          </p>
+          <h1 className="text-2xl font-extrabold text-slate-900 mb-1">Welcome Back</h1>
+          <p className="text-slate-500 text-sm mb-8">Log in to access your dashboard.</p>
 
-          {/* Social Login */}
           <div className="flex flex-col gap-3 mb-6">
             <button 
               type="button"
@@ -126,37 +146,25 @@ export default function LoginPage() {
             </button>
           </div>
 
-          {/* Divider */}
           <div className="flex items-center gap-3 mb-6">
             <div className="flex-1 border-t border-slate-200" />
-            <span className="text-xs text-slate-400 font-medium">
-              Or continue with
-            </span>
+            <span className="text-xs text-slate-400 font-medium">Or continue with</span>
             <div className="flex-1 border-t border-slate-200" />
           </div>
 
-          {/* High-Professional Inline Error Block */}
           {errorMessage && (
-            <div className="flex items-start gap-2.5 bg-red-50 text-red-600 border border-red-200 rounded-xl p-3.5 text-sm mb-6 transition-all animate-in fade-in-50 duration-200">
+            <div className="flex items-start gap-2.5 bg-red-50 text-red-600 border border-red-200 rounded-xl p-3.5 text-sm mb-6 transition-all">
               <AlertCircle size={18} className="mt-0.5 flex-shrink-0" />
               <div className="font-medium leading-relaxed">{errorMessage}</div>
             </div>
           )}
 
-          {/* Login Form */}
           <form className="space-y-4" onSubmit={handleLogin}>
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email Address</label>
               <div className="relative">
                 <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@company.com"
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
-                />
+                <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@company.com" className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all" />
               </div>
             </div>
 
@@ -164,105 +172,39 @@ export default function LoginPage() {
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Password</label>
               <div className="relative">
                 <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type={showPassword ? "text" : "password"}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-12 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
+                <input type={showPassword ? "text" : "password"} required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full pl-10 pr-12 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all" />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
 
-            {/* Remember + Forgot */}
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
+                <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
                 <span className="text-sm text-slate-600 select-none">Remember Me</span>
               </label>
-              <Link
-                href="#"
-                className="text-sm font-semibold text-blue-600 hover:text-blue-700"
-              >
-                Forgot password?
-              </Link>
+              <Link href="#" className="text-sm font-semibold text-blue-600 hover:text-blue-700">Forgot password?</Link>
             </div>
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl text-center transition-colors shadow-sm hover:shadow-md disabled:opacity-50 mt-4"
-            >
+            <button type="submit" disabled={isLoading} className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl text-center transition-colors shadow-sm disabled:opacity-50 mt-4">
               {isLoading ? "Signing in..." : "Sign In"}
             </button>
           </form>
 
           <p className="text-sm text-slate-500 text-center mt-6">
-            Don&apos;t have an account?{" "}
-            <Link
-              href="/signup"
-              className="text-blue-600 font-semibold hover:text-blue-700"
-            >
-              Sign Up
-            </Link>
+            Don&apos;t have an account? <Link href="/signup" className="text-blue-600 font-semibold hover:text-blue-700">Sign Up</Link>
           </p>
         </div>
       </div>
 
-      {/* Right Panel – Promo */}
-      <div
-        className="hidden lg:flex flex-1 flex-col items-center justify-center px-12 relative overflow-hidden"
-        style={{
-          background:
-            "linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #3b82f6 100%)",
-        }}
-      >
+      <div className="hidden lg:flex flex-1 flex-col items-center justify-center px-12 relative overflow-hidden" style={{ background: "linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #3b82f6 100%)" }}>
         <div className="relative z-10 text-center max-w-md">
           <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center mx-auto mb-6">
-            <Image
-              src="/logo.jpeg"
-              alt="CVNet"
-              width={40}
-              height={40}
-              className="rounded-xl object-cover"
-            />
+            <Image src="/logo.jpeg" alt="CVNet" width={40} height={40} className="rounded-xl object-cover" />
           </div>
-          <h2 className="text-3xl font-extrabold text-white mb-4">
-            Unlock Your Data Potential
-          </h2>
-          <p className="text-blue-100 text-base leading-relaxed mb-8">
-            Join CVNet to access powerful analytics, real-time insights, and
-            advanced dashboarding tools tailored for your business needs.
-          </p>
-          <div className="grid grid-cols-2 gap-4 text-left">
-            {[
-              { label: "HR Teams", value: "500+" },
-              { label: "Match Accuracy", value: "94%" },
-              { label: "Time Saved", value: "60%" },
-              { label: "Hiring Quality", value: "+3x" },
-            ].map(({ label, value }) => (
-              <div
-                key={label}
-                className="bg-white/10 rounded-xl px-4 py-4 backdrop-blur-sm border border-white/20"
-              >
-                <p className="text-2xl font-extrabold text-white">{value}</p>
-                <p className="text-blue-200 text-xs mt-1">{label}</p>
-              </div>
-            ))}
-          </div>
+          <h2 className="text-3xl font-extrabold text-white mb-4">Unlock Your Data Potential</h2>
+          <p className="text-blue-100 text-base leading-relaxed mb-8">Join CVNet to access powerful analytics, real-time insights, and advanced dashboarding tools tailored for your business needs.</p>
         </div>
         <div className="absolute top-0 right-0 w-72 h-72 rounded-full bg-blue-400/20 -translate-y-1/2 translate-x-1/2" />
         <div className="absolute bottom-0 left-0 w-56 h-56 rounded-full bg-indigo-900/40 translate-y-1/2 -translate-x-1/2" />
