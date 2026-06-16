@@ -164,7 +164,7 @@ export default function SkillGapPage() {
                       </g>
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-3xl font-black text-slate-900">{matchScore}</span>
+                      <span className="text-3xl font-black text-slate-900">{matchScore}%</span>
                       <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mt-0.5">Score</span>
                     </div>
                   </div>
@@ -176,7 +176,7 @@ export default function SkillGapPage() {
                         <Zap className="text-blue-500 w-3.5 h-3.5" />
                         <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">Max Expertise</span>
                       </div>
-                      <span className="text-[11px] font-black text-blue-700">85</span>
+                      <span className="text-[11px] font-black text-blue-700">85%</span>
                     </div>
 
                     <div className="flex items-center justify-between bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg relative overflow-hidden">
@@ -185,7 +185,7 @@ export default function SkillGapPage() {
                         <Target className="text-slate-500 w-3.5 h-3.5" />
                         <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">Industry Expected</span>
                       </div>
-                      <span className="text-[11px] font-black text-slate-800">{industryScore}</span>
+                      <span className="text-[11px] font-black text-slate-800">{industryScore}%</span>
                     </div>
 
                     <div className={`flex items-center justify-between px-3 py-2 rounded-lg border relative overflow-hidden ${matchScore >= industryScore ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
@@ -194,7 +194,7 @@ export default function SkillGapPage() {
                         {matchScore >= industryScore ? <CheckCircle className="text-emerald-600 w-3.5 h-3.5" /> : <AlertCircle className="text-red-600 w-3.5 h-3.5" />}
                         <span className={`text-[11px] font-bold uppercase tracking-wide ${matchScore >= industryScore ? 'text-emerald-800' : 'text-red-800'}`}>Your Readiness</span>
                       </div>
-                      <span className={`text-[11px] font-black ${matchScore >= industryScore ? 'text-emerald-700' : 'text-red-700'}`}>{matchScore}</span>
+                      <span className={`text-[11px] font-black ${matchScore >= industryScore ? 'text-emerald-700' : 'text-red-700'}`}>{matchScore}%</span>
                     </div>
                   </div>
                 </div>

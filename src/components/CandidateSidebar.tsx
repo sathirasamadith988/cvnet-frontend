@@ -29,7 +29,7 @@ export default function CandidateSidebar() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   
   // State to hold the name strictly from the PostgreSQL database
-  const [dbFullName, setDbFullName] = useState<string>("Niranga Kumara"); 
+  const [dbFullName, setDbFullName] = useState<string>("Niranga Nayanajith"); 
 
   // Sync the sidebar with the real Firebase User AND PostgreSQL
   useEffect(() => {
