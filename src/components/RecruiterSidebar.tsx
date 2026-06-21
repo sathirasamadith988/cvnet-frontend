@@ -23,7 +23,6 @@ const navItems = [
   { href: "/recruiter/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/recruiter/jobs", label: "Jobs", icon: Briefcase },
   { href: "/recruiter/candidates", label: "Candidates", icon: Users },
-  { href: "/recruiter/analytics", label: "Analytics", icon: BarChart2 },
   { href: "/recruiter/interviews", label: "Interviews", icon: Calendar },
 ];
 
