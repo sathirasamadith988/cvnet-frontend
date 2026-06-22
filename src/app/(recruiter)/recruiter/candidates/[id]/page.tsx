@@ -500,16 +500,16 @@ export default function CandidateProfilePage() {
                 <div className="flex flex-col gap-4 mb-5">
                   <ScoreRing
                     score={data.industryScore}
-                    label="Industry Score"
-                    subLabel="Overall industry requirement fit"
+                    label="Match Score"
+                    subLabel="Benchmark against posted skills"
                     colorClass="text-emerald-400"
                     dark
                   />
 
                   <ScoreRing
                     score={data.matchScore}
-                    label="Match Score"
-                    subLabel="Benchmark against posted skills"
+                    label="Industry Score"
+                    subLabel="Overall industry requirement fit"
                     colorClass="text-blue-400"
                     dark
                   />
