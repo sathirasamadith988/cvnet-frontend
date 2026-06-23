@@ -76,7 +76,7 @@ export default function RecruiterSidebar() {
   return (
     <>
       {/* Mobile Header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 z-40 shadow-lg">
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 z-40 shadow-sm">
         <div className="flex items-center gap-3">
           <Image
             src="/logo.jpeg"
@@ -85,12 +85,12 @@ export default function RecruiterSidebar() {
             height={32}
             className="rounded-lg object-cover"
           />
-          <span className="text-white font-bold text-sm tracking-tight">CVNet</span>
+          <span className="text-slate-900 font-bold text-sm tracking-tight">CVNet</span>
         </div>
         <button 
           onClick={toggleSidebar}
           aria-label="Toggle menu"
-          className="p-2 text-slate-300 hover:text-white transition-colors"
+          className="p-2 text-slate-600 hover:text-slate-900 transition-colors"
         >
           {isOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
@@ -106,22 +106,21 @@ export default function RecruiterSidebar() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 h-screen w-64 flex flex-col z-50 transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+        className={`fixed left-0 top-0 h-screen w-64 flex flex-col z-50 bg-white border-r border-slate-200 transition-transform duration-300 ease-in-out lg:translate-x-0 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
-        style={{ backgroundColor: "#0F172A" }}
       >
         {/* Logo (Desktop only) */}
-        <div className="hidden lg:flex items-center gap-3 px-6 py-6 border-b border-slate-800">
+        <div className="hidden lg:flex items-center gap-3 px-6 py-6 border-b border-slate-200">
           <Image
             src="/logo.jpeg"
             alt="CVNet Logo"
             width={40}
             height={40}
-            className="rounded-xl object-cover shadow-lg"
+            className="rounded-xl object-cover shadow-sm"
           />
           <div>
-            <p className="text-white font-black text-lg leading-tight tracking-tight">CVNet</p>
+            <p className="text-slate-900 font-black text-lg leading-tight tracking-tight">CVNet</p>
             <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Recruiter</p>
           </div>
         </div>
@@ -138,8 +137,8 @@ export default function RecruiterSidebar() {
                     onClick={() => setIsOpen(false)}
                     className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-bold transition-all ${
                       isActive
-                        ? "bg-blue-600 text-white shadow-lg shadow-blue-900/20"
-                        : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                        ? "bg-blue-50 text-blue-700"
+                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                     }`}
                   >
                     <Icon size={18} />
@@ -152,15 +151,15 @@ export default function RecruiterSidebar() {
         </nav>
 
         {/* Bottom Section */}
-        <div className="mt-auto border-t border-slate-800 p-4 space-y-2">
+        <div className="mt-auto border-t border-slate-200 p-4 space-y-2 bg-slate-50/50">
           
           <Link
             href="/recruiter/settings"
             onClick={() => setIsOpen(false)}
             className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-bold transition-all ${
               pathname === "/recruiter/settings"
-                ? "bg-slate-800 text-blue-400"
-                : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                ? "bg-slate-100 text-blue-600"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
             }`}
           >
             <Settings size={18} />
@@ -170,19 +169,19 @@ export default function RecruiterSidebar() {
           {/* ✅ LOGOUT BUTTON */}
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-bold text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 transition-all mb-2"
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-bold text-slate-600 hover:bg-rose-50 hover:text-rose-600 transition-all mb-2"
           >
             <LogOut size={18} />
             Logout
           </button>
 
           {/* DYNAMIC USER PROFILE */}
-          <div className="flex items-center gap-3 px-2 py-3 bg-slate-800/50 rounded-2xl border border-slate-800 mt-2">
+          <div className="flex items-center gap-3 px-2 py-3 bg-white rounded-2xl border border-slate-200 mt-2 shadow-sm">
             {userPhoto ? (
               <img 
                 src={userPhoto} 
                 alt={userName} 
-                className="w-10 h-10 rounded-xl object-cover shadow-inner border border-slate-700"
+                className="w-10 h-10 rounded-xl object-cover shadow-inner border border-slate-100"
               />
             ) : (
               <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-sm shadow-inner">
@@ -190,7 +189,7 @@ export default function RecruiterSidebar() {
               </div>
             )}
             <div className="min-w-0">
-              <p className="text-white text-xs font-black truncate leading-tight">{userName}</p>
+              <p className="text-slate-900 text-xs font-black truncate leading-tight">{userName}</p>
               <p className="text-slate-500 text-[10px] font-bold uppercase truncate">Company</p>
             </div>
           </div>
