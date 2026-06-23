@@ -284,13 +284,13 @@ export default function PostJobPage() {
                   <div className="grid sm:grid-cols-2 gap-3">
                     <div>
                       <Label>Department</Label>
-                      <Select value={categoryId} onChange={e => setCategoryId(e.target.value)}>
+                      <Select aria-label="Department" value={categoryId} onChange={e => setCategoryId(e.target.value)}>
                         {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </Select>
                     </div>
                     <div>
                       <Label>Job title</Label>
-                      <Select value={jobTitle} onChange={e => setJobTitle(e.target.value)}>
+                      <Select aria-label="Job title" value={jobTitle} onChange={e => setJobTitle(e.target.value)}>
                         {(categories.find(c => c.id === categoryId)?.roles ?? []).map(r => (
                           <option key={r} value={r}>{r}</option>
                         ))}
@@ -303,7 +303,7 @@ export default function PostJobPage() {
                   <div className="grid sm:grid-cols-2 gap-3">
                     <div>
                       <Label>Employment type</Label>
-                      <Select value={employmentType} onChange={e => setEmploymentType(e.target.value)}>
+                      <Select aria-label="Employment type" value={employmentType} onChange={e => setEmploymentType(e.target.value)}>
                         <option value="FULL_TIME">Full Time</option>
                         <option value="PART_TIME">Part Time</option>
                         <option value="CONTRACT">Contract</option>
@@ -312,7 +312,7 @@ export default function PostJobPage() {
                     </div>
                     <div>
                       <Label>Workplace type</Label>
-                      <Select value={workplaceType} onChange={e => setWorkplaceType(e.target.value)}>
+                      <Select aria-label="Workplace type" value={workplaceType} onChange={e => setWorkplaceType(e.target.value)}>
                         <option value="REMOTE">Remote</option>
                         <option value="HYBRID">Hybrid</option>
                         <option value="ONSITE">On-Site</option>
@@ -362,7 +362,7 @@ export default function PostJobPage() {
                           {!skill.isVisible && <EyeOff size={10} />}
                           {skill.name}
                           {skill.showLevel && <span className="opacity-60 text-[10px]">({skill.level.toLowerCase()})</span>}
-                          <button onClick={() => setSkills(skills.filter(s => s.name !== skill.name))} className="hover:text-red-500 transition-colors ml-0.5">
+                          <button type="button" aria-label="Remove skill" onClick={() => setSkills(skills.filter(s => s.name !== skill.name))} className="hover:text-red-500 transition-colors ml-0.5">
                             <X size={11} />
                           </button>
                         </span>
@@ -380,12 +380,12 @@ export default function PostJobPage() {
                         placeholder="e.g. React.js"
                         className="flex-1 min-w-0"
                       />
-                      <Select value={newSkillLevel} onChange={e => setNewSkillLevel(e.target.value)} className="!w-36 shrink-0">
+                      <Select aria-label="Skill level" value={newSkillLevel} onChange={e => setNewSkillLevel(e.target.value)} className="!w-36 shrink-0">
                         <option value="BEGINNER">Beginner</option>
                         <option value="INTERMEDIATE">Intermediate</option>
                         <option value="EXPERT">Expert</option>
                       </Select>
-                      <button
+                      <button type="button"
                         onClick={addSkill}
                         disabled={!newSkillName.trim()}
                         className="shrink-0 inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2.5 rounded-xl disabled:opacity-40 transition-colors"
@@ -422,7 +422,7 @@ export default function PostJobPage() {
                         <span key={deg} className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-violet-50 text-violet-700 border border-violet-100">
                           <GraduationCap size={11} />
                           {deg}
-                          <button onClick={() => setEducations(educations.filter(e => e !== deg))} className="hover:text-red-500 transition-colors ml-0.5">
+                          <button type="button" aria-label="Remove education" onClick={() => setEducations(educations.filter(e => e !== deg))} className="hover:text-red-500 transition-colors ml-0.5">
                             <X size={11} />
                           </button>
                         </span>
@@ -437,7 +437,7 @@ export default function PostJobPage() {
                       placeholder="e.g. BSc Hons in Computer Science"
                       className="flex-1 min-w-0"
                     />
-                    <button
+                    <button type="button"
                       onClick={addEducation}
                       disabled={!newDegree.trim()}
                       className="shrink-0 inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2.5 rounded-xl disabled:opacity-40 transition-colors"
@@ -474,7 +474,7 @@ export default function PostJobPage() {
                   <div>
                     <Label optional>Salary range</Label>
                     <div className="flex gap-2">
-                      <Select value={currency} onChange={e => setCurrency(e.target.value)} className="!w-28 shrink-0">
+                      <Select aria-label="Currency" value={currency} onChange={e => setCurrency(e.target.value)} className="!w-28 shrink-0">
                         {WORLD_CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
                       </Select>
                       <Input
@@ -508,7 +508,7 @@ export default function PostJobPage() {
 
             {/* ── Nav buttons ── */}
             <div className="flex items-center justify-between pt-2">
-              <button
+              <button type="button"
                 onClick={() => setStep(s => s - 1)}
                 disabled={step === 1}
                 className="px-5 py-2.5 text-sm font-semibold text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none transition-colors"
@@ -516,7 +516,7 @@ export default function PostJobPage() {
                 Back
               </button>
 
-              <button
+              <button type="button"
                 onClick={() => step < 3 ? setStep(s => s + 1) : setShowConfirmModal(true)}
                 disabled={isLoading}
                 className={`inline-flex items-center gap-2 px-6 py-2.5 text-sm font-semibold rounded-xl text-white transition-colors disabled:opacity-70 ${step === 3
@@ -621,7 +621,7 @@ export default function PostJobPage() {
                 </div>
 
                 {/* Apply button (disabled preview) */}
-                <button disabled className="w-full bg-slate-900 text-white text-sm font-semibold py-3 rounded-xl opacity-40 cursor-default mt-2">
+                <button type="button" disabled className="w-full bg-slate-900 text-white text-sm font-semibold py-3 rounded-xl opacity-40 cursor-default mt-2">
                   Apply for this position
                 </button>
               </div>
@@ -645,14 +645,14 @@ export default function PostJobPage() {
               </p>
             </div>
             <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center gap-3 justify-end">
-              <button
+              <button type="button"
                 onClick={() => setShowConfirmModal(false)}
                 className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors"
                 disabled={isLoading}
               >
                 Cancel
               </button>
-              <button
+              <button type="button"
                 onClick={() => {
                   setShowConfirmModal(false);
                   handlePostJob();

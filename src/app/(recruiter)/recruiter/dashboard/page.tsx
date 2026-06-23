@@ -291,7 +291,7 @@ function ErrorState({ message }: { message: string }) {
           <h2 className="text-base font-bold text-slate-900 mb-1">Dashboard unavailable</h2>
           <p className="text-sm text-slate-500 leading-relaxed">{message}</p>
         </div>
-        <button
+        <button type="button"
           onClick={() => window.location.reload()}
           className="text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors"
         >
@@ -350,6 +350,7 @@ export default function RecruiterDashboardPage() {
         <div className="relative flex-1 max-w-sm">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           <input
+            aria-label="Search candidates or roles"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search candidates or roles…"

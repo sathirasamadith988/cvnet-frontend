@@ -230,7 +230,7 @@ function FullProfileModal({ appId, jobId, onClose }: { appId: string; jobId: str
         {/* Panel Header */}
         <div className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-100 px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-widest">
-            <button onClick={onClose} className="hover:text-blue-600 transition-colors flex items-center gap-1">
+            <button type="button" onClick={onClose} className="hover:text-blue-600 transition-colors flex items-center gap-1">
               <ArrowLeft size={14} /> Back to Job Dashboard
             </button>
             {data && (
@@ -240,7 +240,7 @@ function FullProfileModal({ appId, jobId, onClose }: { appId: string; jobId: str
               </>
             )}
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors">
+          <button type="button" aria-label="Close" onClick={onClose} className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors">
             <X size={16} className="text-slate-600" />
           </button>
         </div>
@@ -254,7 +254,7 @@ function FullProfileModal({ appId, jobId, onClose }: { appId: string; jobId: str
         {!isLoading && !data && (
           <div className="flex flex-col items-center justify-center h-96 text-slate-500">
             <p className="text-xl font-bold text-slate-800 mb-2">Profile Not Found</p>
-            <button onClick={onClose} className="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold mt-4">Go Back</button>
+            <button type="button" onClick={onClose} className="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold mt-4">Go Back</button>
           </div>
         )}
 
@@ -370,7 +370,7 @@ function FullProfileModal({ appId, jobId, onClose }: { appId: string; jobId: str
                     {availableSections.map(tab => {
                       const Icon = tab.icon;
                       return (
-                        <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                        <button type="button" key={tab.key} onClick={() => setActiveTab(tab.key)}
                           className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${
                             activeTab === tab.key
                               ? 'bg-slate-900 text-white shadow-sm'
@@ -738,7 +738,7 @@ export default function JobDetailPage() {
           </div>
 
           <div className="relative">
-            <button onClick={() => setIsStatusOpen(!isStatusOpen)}
+            <button type="button" onClick={() => setIsStatusOpen(!isStatusOpen)}
               className="flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm">
               <span className="hidden sm:inline">Manage Job</span>
               <span className="sm:hidden">Manage</span>
@@ -746,8 +746,8 @@ export default function JobDetailPage() {
             </button>
             {isStatusOpen && (
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl z-50 p-2 text-slate-700 border border-slate-100">
-                {job.status === 1 && <button onClick={handleCloseJob} className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-red-50 hover:text-red-600 rounded-xl transition-colors">Close Job</button>}
-                {job.status === 0 && <button onClick={handleRepostJob} className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-green-50 hover:text-green-600 rounded-xl transition-colors">Repost Job</button>}
+                {job.status === 1 && <button type="button" onClick={handleCloseJob} className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-red-50 hover:text-red-600 rounded-xl transition-colors">Close Job</button>}
+                {job.status === 0 && <button type="button" onClick={handleRepostJob} className="w-full text-left px-3 py-2 text-xs font-bold hover:bg-green-50 hover:text-green-600 rounded-xl transition-colors">Repost Job</button>}
               </div>
             )}
           </div>
@@ -869,7 +869,7 @@ export default function JobDetailPage() {
                 
                 <div className="flex items-center bg-slate-50 border border-slate-100 rounded-xl p-1 gap-0.5 overflow-x-auto scrollbar-none">
                   {['All', ...pipelineStatuses].map(tab => (
-                    <button key={tab} onClick={() => setSelectedStatus(tab)}
+                    <button type="button" key={tab} onClick={() => setSelectedStatus(tab)}
                       className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all whitespace-nowrap ${
                         tab === selectedStatus ? 'bg-white text-slate-900 shadow-sm border border-slate-200' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100/50'
                       }`}>
@@ -882,7 +882,7 @@ export default function JobDetailPage() {
               <div className="p-4 sm:p-5 border-b border-slate-100 bg-slate-50/50">
                 <div className="relative max-w-md">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                  <input value={search} onChange={e => setSearch(e.target.value)}
+                  <input aria-label="Search candidates" value={search} onChange={e => setSearch(e.target.value)}
                     placeholder="Search candidates by name..."
                     className="w-full pl-8 pr-4 py-2 text-sm text-slate-700 bg-white border border-slate-200 rounded-xl placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" />
                 </div>
@@ -933,7 +933,7 @@ export default function JobDetailPage() {
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <button
+                          <button type="button"
                             onClick={e => { e.stopPropagation(); setFullProfileAppId(c.appId); }}
                             className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-blue-600 transition-colors"
                           >
@@ -941,7 +941,7 @@ export default function JobDetailPage() {
                           </button>
                           
                           <div className="relative">
-                            <select value="" onChange={e => handleApplicantAction(c.appId, e.target.value as any)} onClick={e => e.stopPropagation()}
+                            <select aria-label="Applicant action" value="" onChange={e => handleApplicantAction(c.appId, e.target.value as any)} onClick={e => e.stopPropagation()}
                               className="appearance-none bg-white text-xs font-semibold pl-2 pr-6 py-1.5 rounded-lg border border-slate-200 cursor-pointer focus:outline-none focus:border-blue-500 text-slate-700 shadow-sm">
                               <option value="" disabled>Action</option>
                               {c.status !== 'Rejected' && <option value="reject">Reject</option>}
@@ -977,7 +977,7 @@ export default function JobDetailPage() {
                     <p className="text-xs text-slate-500 truncate mt-0.5">{selectedApplicant.jobRole}</p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0 ml-4">
-                    <button
+                    <button type="button"
                       onClick={() => setFullProfileAppId(selectedApplicant.appId)}
                       className="hidden sm:flex items-center gap-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors">
                       <Brain size={13} /> Full AI Profile
@@ -993,7 +993,7 @@ export default function JobDetailPage() {
 
                 <div className="flex gap-1.5 overflow-x-auto border-b border-slate-100 mb-4 pb-0.5 scrollbar-none">
                   {availableTabs.map(tab => (
-                    <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                    <button type="button" key={tab.key} onClick={() => setActiveTab(tab.key)}
                       className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap ${
                         activeTab === tab.key ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
                       }`}>
@@ -1036,12 +1036,12 @@ export default function JobDetailPage() {
                 </div>
 
                 <div className="mt-5 pt-4 border-t border-slate-100 flex justify-between items-center">
-                  <button
+                  <button type="button"
                     onClick={() => setFullProfileAppId(selectedApplicant.appId)}
                     className="sm:hidden flex items-center gap-1.5 text-blue-600 text-xs font-bold">
                     <Brain size={13} /> Full AI Profile
                   </button>
-                  <button onClick={() => setSelectedApplicant(null)} className="text-xs font-semibold text-slate-400 hover:text-slate-600 transition-colors ml-auto">
+                  <button type="button" onClick={() => setSelectedApplicant(null)} className="text-xs font-semibold text-slate-400 hover:text-slate-600 transition-colors ml-auto">
                     Close preview
                   </button>
                 </div>

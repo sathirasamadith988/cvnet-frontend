@@ -304,7 +304,7 @@ export default function CandidateProfilePage() {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4">
         <p className="text-base font-bold text-slate-800">Profile not found</p>
-        <button
+        <button type="button"
           onClick={() => router.back()}
           className="text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors"
         >
@@ -333,6 +333,7 @@ export default function CandidateProfilePage() {
           </div>
 
           <button
+            aria-label="Go back"
             onClick={() => router.back()}
             className="sm:hidden flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors"
           >

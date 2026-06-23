@@ -87,7 +87,7 @@ export default function RecruiterSidebar() {
           />
           <span className="text-slate-900 font-bold text-sm tracking-tight">CVNet</span>
         </div>
-        <button 
+        <button type="button" 
           onClick={toggleSidebar}
           aria-label="Toggle menu"
           className="p-2 text-slate-600 hover:text-slate-900 transition-colors"
@@ -167,7 +167,7 @@ export default function RecruiterSidebar() {
           </Link>
 
           {/* ✅ LOGOUT BUTTON */}
-          <button
+          <button type="button"
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-bold text-slate-600 hover:bg-rose-50 hover:text-rose-600 transition-all mb-2"
           >

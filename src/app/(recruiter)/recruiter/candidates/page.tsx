@@ -204,6 +204,7 @@ export default function CandidatesPage() {
           <div className="relative flex-1 max-w-sm">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
+              aria-label="Search candidates"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search by name or email…"
@@ -235,6 +236,7 @@ export default function CandidatesPage() {
                   {/* Job Filter */}
                   <div className="relative shrink-0">
                     <select
+                      aria-label="Filter by job"
                       value={selectedJobId}
                       onChange={e => setSelectedJobId(e.target.value)}
                       className="appearance-none pl-3 pr-8 py-2.5 text-sm font-semibold border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer max-w-[250px] sm:max-w-[300px] truncate shadow-sm hover:bg-slate-50 transition-colors"
@@ -249,6 +251,7 @@ export default function CandidatesPage() {
                   {/* Sort Order */}
                   <div className="relative shrink-0">
                     <select
+                      aria-label="Sort candidates"
                       value={sortOrder}
                       onChange={e => setSortOrder(e.target.value)}
                       className="appearance-none pl-3 pr-8 py-2.5 text-sm font-semibold border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer shadow-sm hover:bg-slate-50 transition-colors"
@@ -258,7 +261,7 @@ export default function CandidatesPage() {
                     <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                   </div>
                   {hasFilters && (
-                    <button
+                    <button type="button"
                       onClick={() => { setSearch(''); setSelectedJobId(''); }}
                       className="text-xs font-semibold text-slate-400 hover:text-slate-700 flex items-center gap-1 transition-colors"
                     >

@@ -188,7 +188,7 @@ export default function RecruiterSettingsPage() {
         {/* Sidebar Navigation */}
         <div className="space-y-1">
           {sections.map((s) => (
-            <button
+            <button type="button"
               key={s.id}
               onClick={() => { setActiveSection(s.id); setStatusMessage({ type: 'success', text: null }); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-bold text-sm transition-all ${
@@ -213,7 +213,7 @@ export default function RecruiterSettingsPage() {
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="flex items-center gap-6">
                   <label className="relative group cursor-pointer block">
-                    <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={isSaving} />
+                    <input aria-label="Upload company logo" type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={isSaving} />
                     {profileImageUrl ? (
                       <img src={profileImageUrl} alt="Company Logo" className="w-24 h-24 rounded-3xl object-cover border-2 border-slate-200 group-hover:border-blue-400 transition-colors" />
                     ) : (
@@ -231,7 +231,7 @@ export default function RecruiterSettingsPage() {
                     <div className="flex gap-2">
                       <label className="text-xs font-bold text-blue-600 hover:underline cursor-pointer">
                         Upload new
-                        <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={isSaving} />
+                        <input aria-label="Upload new company logo" type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={isSaving} />
                       </label>
                     </div>
                   </div>
@@ -318,7 +318,7 @@ export default function RecruiterSettingsPage() {
             {/* Bottom Actions */}
             <div className="mt-10 pt-8 border-t border-slate-50 flex items-center justify-between">
               <p className="text-xs text-slate-400 font-medium italic">All data synced securely with PostgreSQL.</p>
-              <button 
+              <button type="button" 
                 onClick={handleSave}
                 disabled={isSaving}
                 className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-8 py-3.5 rounded-2xl font-bold shadow-xl shadow-slate-200 transition-all active:scale-95 disabled:opacity-70"
@@ -335,7 +335,7 @@ export default function RecruiterSettingsPage() {
             <div className="bg-red-50 border border-red-100 rounded-[2.5rem] p-8 mt-6">
               <h3 className="font-bold text-red-900 mb-2">Danger Zone</h3>
               <p className="text-sm text-red-600 mb-6 font-medium">Once you delete your account, there is no going back. Please be certain.</p>
-              <button className="text-sm font-bold text-red-600 bg-white border border-red-200 px-6 py-2.5 rounded-xl hover:bg-red-600 hover:text-white transition-all">
+              <button type="button" className="text-sm font-bold text-red-600 bg-white border border-red-200 px-6 py-2.5 rounded-xl hover:bg-red-600 hover:text-white transition-all">
                 Delete Account
               </button>
             </div>

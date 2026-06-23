@@ -242,6 +242,7 @@ export default function JobsPage() {
         <div className="relative flex-1 max-w-sm">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           <input
+            aria-label="Search jobs"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search title or job ID…"
@@ -304,7 +305,7 @@ export default function JobsPage() {
           {/* Status tabs */}
           <div className="flex items-center bg-white border border-slate-100 rounded-xl p-1 gap-0.5">
             {FILTER_STATUSES.map(f => (
-              <button
+              <button type="button"
                 key={f}
                 onClick={() => setStatusFilter(f)}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${f === statusFilter
@@ -320,6 +321,7 @@ export default function JobsPage() {
           {/* Dept select */}
           <div className="relative">
             <select
+              aria-label="Filter by department"
               value={deptFilter}
               onChange={e => setDeptFilter(e.target.value)}
               className="appearance-none pl-3.5 pr-8 py-2 text-xs font-semibold border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
@@ -334,6 +336,7 @@ export default function JobsPage() {
           {/* Sort select */}
           <div className="relative ml-auto">
             <select
+              aria-label="Sort jobs"
               value={sortBy}
               onChange={e => setSortBy(e.target.value as typeof SORT_OPTIONS[number])}
               className="appearance-none pl-3.5 pr-8 py-2 text-xs font-semibold border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
@@ -345,7 +348,7 @@ export default function JobsPage() {
 
           {/* Clear filters */}
           {hasActiveFilters && (
-            <button
+            <button type="button"
               onClick={() => { setSearch(''); setStatusFilter('All'); setDeptFilter('All'); }}
               className="flex items-center gap-1 text-xs font-semibold text-slate-400 hover:text-slate-700 transition-colors"
             >
@@ -356,7 +359,7 @@ export default function JobsPage() {
 
         {/* Mobile filter toggle */}
         <div className="sm:hidden flex items-center gap-2">
-          <button
+          <button type="button"
             onClick={() => setShowMobileFilters(v => !v)}
             className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border transition-colors ${showMobileFilters || hasActiveFilters
                 ? 'bg-slate-900 text-white border-slate-900'
@@ -374,6 +377,7 @@ export default function JobsPage() {
 
           <div className="relative ml-auto">
             <select
+              aria-label="Sort jobs (mobile)"
               value={sortBy}
               onChange={e => setSortBy(e.target.value as typeof SORT_OPTIONS[number])}
               className="appearance-none pl-3 pr-7 py-2 text-xs font-semibold border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none"
@@ -391,7 +395,7 @@ export default function JobsPage() {
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Status</p>
               <div className="flex gap-2">
                 {FILTER_STATUSES.map(f => (
-                  <button
+                  <button type="button"
                     key={f}
                     onClick={() => setStatusFilter(f)}
                     className={`flex-1 py-2 text-xs font-semibold rounded-xl border transition-all ${f === statusFilter
@@ -409,6 +413,7 @@ export default function JobsPage() {
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Department</p>
               <div className="relative">
                 <select
+                  aria-label="Filter by department (mobile)"
                   value={deptFilter}
                   onChange={e => setDeptFilter(e.target.value)}
                   className="w-full appearance-none pl-3.5 pr-8 py-2.5 text-sm font-semibold border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none"
@@ -422,7 +427,7 @@ export default function JobsPage() {
             </div>
 
             {hasActiveFilters && (
-              <button
+              <button type="button"
                 onClick={() => { setSearch(''); setStatusFilter('All'); setDeptFilter('All'); setShowMobileFilters(false); }}
                 className="w-full py-2 text-xs font-semibold text-slate-500 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
               >
