@@ -192,14 +192,87 @@ function StatCard({
   );
 }
 
-// ─── Loading ──────────────────────────────────────────────────────────────────
+// ─── Loading Skeleton ─────────────────────────────────────────────────────────
 
-function LoadingState() {
+function DashboardSkeleton() {
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-      <div className="flex flex-col items-center gap-3">
-        <Loader2 className="animate-spin text-blue-600" size={28} />
-        <p className="text-sm font-medium text-slate-400">Loading dashboard…</p>
+    <div className="animate-pulse space-y-6">
+
+
+      {/* Stat Strip skeleton */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+        {[1, 2, 3].map(i => (
+          <div key={i} className={`bg-white rounded-2xl border border-slate-100 p-4 sm:p-5 flex items-center gap-3 sm:gap-4 ${i === 3 ? 'col-span-2 sm:col-span-1' : ''}`}>
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-100 shrink-0"></div>
+            <div className="flex-1">
+              <div className="h-3 bg-slate-100 rounded w-20 mb-2"></div>
+              <div className="h-6 bg-slate-100 rounded w-12"></div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Chart + Candidates skeleton */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-6 items-start">
+        {/* Chart skeleton */}
+        <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-100 p-5 sm:p-6 h-64 sm:h-72 flex flex-col">
+          <div className="h-4 bg-slate-100 rounded w-32 mb-1"></div>
+          <div className="h-3 bg-slate-100 rounded w-48 mb-8"></div>
+          <div className="w-full flex-1 bg-slate-50 rounded-xl"></div>
+        </div>
+
+        {/* Sidebar skeleton */}
+        <div className="lg:col-span-2 flex flex-col gap-3">
+          <div className="bg-white rounded-2xl border border-slate-100 p-5">
+            <div className="h-4 bg-slate-100 rounded w-24 mb-6"></div>
+            <div className="space-y-4">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i}>
+                   <div className="flex justify-between items-center mb-1.5">
+                     <div className="h-3 bg-slate-100 rounded w-20"></div>
+                     <div className="h-3 bg-slate-100 rounded w-8"></div>
+                   </div>
+                   <div className="h-1.5 bg-slate-50 rounded-full w-full"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="bg-blue-600 rounded-2xl p-5">
+             <div className="h-3 bg-blue-500 rounded w-16 mb-4"></div>
+             <div className="flex items-center justify-between gap-4">
+               <div className="flex items-center gap-3 min-w-0">
+                 <div className="w-9 h-9 rounded-xl bg-blue-500 shrink-0"></div>
+                 <div className="min-w-0 flex flex-col">
+                   <div className="h-4 bg-blue-500 rounded w-24 sm:w-32 mb-2"></div>
+                   <div className="h-3 bg-blue-500 rounded w-20"></div>
+                 </div>
+               </div>
+               <div className="shrink-0 flex items-baseline gap-1">
+                 <div className="h-8 bg-blue-500 rounded w-10 sm:w-14"></div>
+                 <div className="h-4 bg-blue-500 rounded w-12 hidden sm:block"></div>
+               </div>
+             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Candidates Table skeleton */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-5">
+        <div className="h-4 bg-slate-100 rounded w-32 mb-1"></div>
+        <div className="h-3 bg-slate-100 rounded w-48 mb-6"></div>
+        <div className="space-y-4">
+          {[1, 2, 3].map(i => (
+             <div key={i} className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 shrink-0"></div>
+                <div className="flex-1">
+                  <div className="h-4 bg-slate-100 rounded w-32 mb-2"></div>
+                  <div className="h-3 bg-slate-100 rounded w-48 hidden sm:block"></div>
+                </div>
+                <div className="w-24 h-4 bg-slate-100 rounded hidden sm:block"></div>
+                <div className="w-16 h-6 bg-slate-100 rounded-lg"></div>
+             </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -209,8 +282,8 @@ function LoadingState() {
 
 function ErrorState({ message }: { message: string }) {
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-      <div className="bg-white rounded-2xl border border-red-100 p-8 max-w-sm w-full flex flex-col items-center gap-4 text-center">
+    <div className="py-12 flex items-center justify-center">
+      <div className="bg-white rounded-2xl border border-red-100 p-8 max-w-sm w-full flex flex-col items-center gap-4 text-center shadow-sm">
         <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center text-red-500">
           <AlertCircle size={24} />
         </div>
@@ -263,8 +336,69 @@ export default function RecruiterDashboardPage() {
     fetchDashboardData();
   }, []);
 
-  if (isLoading) return <LoadingState />;
-  if (error || !data) return <ErrorState message={error ?? 'Unknown error.'} />;
+  const topBar = (
+    <header className="bg-white border-b border-slate-100 sticky top-0 z-40">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+        {/* Brand + breadcrumb */}
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-sm font-semibold text-slate-900 hidden sm:block">Recruiter</span>
+          <ChevronRight size={14} className="text-slate-300 hidden sm:block" />
+          <span className="text-sm font-semibold text-slate-400 hidden sm:block">Overview</span>
+        </div>
+
+        {/* Search */}
+        <div className="relative flex-1 max-w-sm">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <input
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search candidates or roles…"
+            className="w-full pl-9 pr-4 py-2 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+          />
+        </div>
+
+        {/* Post job CTA */}
+        <Link
+          href="/recruiter/post-job"
+          className="shrink-0 inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm shadow-blue-200"
+        >
+          <Plus size={15} />
+          <span className="hidden sm:inline">Post job</span>
+        </Link>
+      </div>
+    </header>
+  );
+
+  const pageHeading = (
+    <div>
+      <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Overview</h1>
+      <p className="text-sm text-slate-500 mt-0.5">Your recruitment pipeline at a glance.</p>
+    </div>
+  );
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        {topBar}
+        <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+          {pageHeading}
+          <DashboardSkeleton />
+        </main>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        {topBar}
+        <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+          {pageHeading}
+          <ErrorState message={error ?? 'Unknown error.'} />
+        </main>
+      </div>
+    );
+  }
 
   const filteredCandidates = data.topCandidates.filter(c =>
     !searchQuery ||
@@ -274,48 +408,13 @@ export default function RecruiterDashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-
       {/* ── Top Bar ── */}
-      <header className="bg-white border-b border-slate-100 sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
-
-          {/* Brand + breadcrumb */}
-          <div className="flex items-center gap-2 shrink-0">
-
-            <span className="text-sm font-semibold text-slate-900 hidden sm:block">Recruiter</span>
-            <ChevronRight size={14} className="text-slate-300 hidden sm:block" />
-            <span className="text-sm font-semibold text-slate-400 hidden sm:block">Overview</span>
-          </div>
-
-          {/* Search */}
-          <div className="relative flex-1 max-w-sm">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            <input
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search candidates or roles…"
-              className="w-full pl-9 pr-4 py-2 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
-            />
-          </div>
-
-          {/* Post job CTA */}
-          <Link
-            href="/recruiter/post-job"
-            className="shrink-0 inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm shadow-blue-200"
-          >
-            <Plus size={15} />
-            <span className="hidden sm:inline">Post job</span>
-          </Link>
-        </div>
-      </header>
+      {topBar}
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
 
         {/* ── Page heading ── */}
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Overview</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Your recruitment pipeline at a glance.</p>
-        </div>
+        {pageHeading}
 
         {/* ── Stat Strip ── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
