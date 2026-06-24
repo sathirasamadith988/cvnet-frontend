@@ -174,18 +174,56 @@ export default function DashboardPage() {
   const [showAddTrack, setShowAddTrack] = useState(false);
   const [deleteWarning, setDeleteWarning] = useState<string | null>(null);
 
-  const fetchDashboardData = async (profileId?: string) => {
+  const fetchDashboardData = async (profileId?: string, currentUser = auth.currentUser) => {
     try {
-      if (!auth.currentUser) return;
-      const token = await auth.currentUser.getIdToken();
-      const cfg = { headers: { Authorization: `Bearer ${token}` }, ...(profileId ? { params: { profileId } } : {}) };
-      const res = await axios.get(`${API_URL}/summary`, cfg);
-      setData(res.data);
-      const pid = profileId || res.data?.activeProfileId;
-      if (pid) {
-        setActiveProfileId(pid);
+      if (!currentUser) return;
+      const token = await currentUser.getIdToken();
+      const headers = { Authorization: `Bearer ${token}` };
+
+      // First call — get profiles list + whatever the backend resolved as active
+      const res = await axios.get(`${API_URL}/summary`, {
+        headers,
+        ...(profileId ? { params: { profileId } } : {}),
+      });
+
+      // The backend may resolve activeProfileId to "General CV Profile" because
+      // default_profile_id is set to that ID by the CV editor. That profile has no
+      // skill requirements or job-application links, so all stats show 0.
+      // Fix: detect this case and override with the first real job role profile.
+      const allProfiles: Profile[] = res.data?.profiles || [];
+      const jobRoleProfiles = allProfiles.filter(p => p.jobRole !== "General CV Profile");
+      const apiActiveId: string = res.data?.activeProfileId || "";
+      const apiActiveIsJobRole = jobRoleProfiles.some(p => p.id === apiActiveId);
+
+      let effectivePid: string;
+      if (profileId) {
+        // Explicit switch from the dropdown — trust it
+        effectivePid = profileId;
+      } else if (apiActiveIsJobRole) {
+        // Backend already resolved to a real job role
+        effectivePid = apiActiveId;
+      } else {
+        // Backend resolved to General CV Profile or nothing — use first real job role
+        effectivePid = jobRoleProfiles[0]?.id || apiActiveId;
+      }
+
+
+      // If we need a different profile than what the summary was fetched for, re-fetch
+      let summaryData = res.data;
+      if (effectivePid && effectivePid !== apiActiveId && !profileId) {
+        const reRes = await axios.get(`${API_URL}/summary`, {
+          headers,
+          params: { profileId: effectivePid },
+        });
+        summaryData = reRes.data;
+      }
+
+      setData(summaryData);
+
+      if (effectivePid) {
+        setActiveProfileId(effectivePid);
         const mx = await axios.get(`${API_URL}/readiness-matrix`, {
-          headers: { Authorization: `Bearer ${token}` }, params: { profileId: pid }
+          headers, params: { profileId: effectivePid },
         });
         setSkillBreakdown(mx.data?.breakdown || []);
         setMatrixMatchScore(mx.data?.matchScore || 0);
@@ -194,10 +232,10 @@ export default function DashboardPage() {
     finally { setIsLoading(false); }
   };
 
-  const loadTrackMeta = async () => {
+  const loadTrackMeta = async (currentUser = auth.currentUser) => {
     try {
-      if (!auth.currentUser) return;
-      const token = await auth.currentUser.getIdToken();
+      if (!currentUser) return;
+      const token = await currentUser.getIdToken();
       const res = await axios.get(`${API_URL}/available-tracks`, { headers: { Authorization: `Bearer ${token}` } });
       setAvailableTracks(res.data || []);
       if (res.data?.length) {
@@ -209,7 +247,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(user => {
-      if (user) { loadTrackMeta(); fetchDashboardData(); }
+      if (user) { loadTrackMeta(user); fetchDashboardData(undefined, user); }
       else setIsLoading(false);
     });
     return () => unsub();
