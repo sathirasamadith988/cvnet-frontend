@@ -11,6 +11,8 @@ import {
   Briefcase,
   Settings,
   LogOut,
+  Menu,
+  X,
 } from "lucide-react";
 import { auth } from "@/lib/firebaseConfig";
 import { onAuthStateChanged, signOut, User as FirebaseUser } from "firebase/auth";
@@ -27,6 +29,7 @@ export default function CandidateSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
   
   // State to hold the name strictly from the PostgreSQL database
   const [dbFullName, setDbFullName] = useState<string>("Niranga Nayanajith"); 
@@ -62,6 +65,8 @@ export default function CandidateSidebar() {
     return () => unsubscribe();
   }, []);
 
+  const toggleSidebar = () => setIsOpen(!isOpen);
+
   // Compute initials cleanly
   const getInitials = (name: string) => {
     if (!name) return "CV";
@@ -93,93 +98,127 @@ export default function CandidateSidebar() {
   };
 
   return (
-    <aside
-      className="fixed left-0 top-0 h-screen w-64 flex flex-col z-30"
-      style={{ backgroundColor: "#0F172A" }}
-    >
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-5 py-5 border-b border-slate-700">
-        <Image
-          src="/logo.jpeg"
-          alt="CVNet Logo"
-          width={36}
-          height={36}
-          className="rounded-lg object-cover"
-        />
-        <div>
-          <p className="text-white font-bold text-base leading-tight">CVNet</p>
-          <p className="text-slate-400 text-xs">HR Tech Platform</p>
+    <>
+      {/* Mobile Header */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 z-40 shadow-sm">
+        <div className="flex items-center gap-3">
+          <Image
+            src="/logo.jpeg"
+            alt="CVNet Logo"
+            width={32}
+            height={32}
+            className="rounded-lg object-cover"
+          />
+          <span className="text-slate-900 font-bold text-sm tracking-tight">CVNet</span>
         </div>
+        <button type="button" 
+          onClick={toggleSidebar}
+          aria-label="Toggle menu"
+          className="p-2 text-slate-600 hover:text-slate-900 transition-colors"
+        >
+          {isOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 overflow-y-auto">
-        <ul className="space-y-1">
-          {navItems.map(({ href, label, icon: Icon }) => {
-            const isActive = pathname === href;
-            return (
-              <li key={href}>
-                <Link
-                  href={href}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? "bg-blue-600 text-white"
-                      : "text-slate-300 hover:bg-slate-700 hover:text-white"
-                  }`}
-                >
-                  <Icon size={18} />
-                  <span className="flex-1">{label}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+      {/* Backdrop for mobile */}
+      {isOpen && (
+        <div 
+          className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity duration-300"
+          onClick={toggleSidebar}
+        />
+      )}
 
-      {/* Settings + User */}
-      <div className="border-t border-slate-700">
-        <Link
-          href="/settings"
-          className={`flex items-center gap-3 px-6 py-3 text-sm font-medium transition-colors ${
-            pathname === "/settings"
-              ? "text-blue-400"
-              : "text-slate-400 hover:text-white"
-          }`}
-        >
-          <Settings size={16} />
-          Settings
-        </Link>
-        
-        {/* ✅ CHANGED FROM LINK TO FUNCTIONAL BUTTON */}
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-6 py-3 text-sm font-medium text-slate-400 hover:text-white transition-colors"
-        >
-          <LogOut size={16} />
-          Logout
-        </button>
-
-        {/* ✅ DYNAMIC USER PROFILE BLOCK */}
-        <div className="flex items-center gap-3 px-5 py-4 border-t border-slate-700">
-          {profileImageUrl ? (
-            <img 
-              src={profileImageUrl} 
-              alt="Avatar" 
-              className="w-9 h-9 rounded-full object-cover flex-shrink-0"
-            />
-          ) : (
-            <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-              {getInitials(dbFullName)}
-            </div>
-          )}
-          <div className="min-w-0">
-            <p className="text-white text-sm font-semibold truncate">
-              {dbFullName}
-            </p>
-            <p className="text-slate-400 text-xs truncate">Candidate Account</p>
+      {/* Sidebar */}
+      <aside
+        className={`fixed left-0 top-0 h-screen w-64 flex flex-col z-50 bg-white border-r border-slate-200 transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        {/* Logo (Desktop only) */}
+        <div className="hidden lg:flex items-center gap-3 px-6 py-6 border-b border-slate-200">
+          <Image
+            src="/logo.jpeg"
+            alt="CVNet Logo"
+            width={40}
+            height={40}
+            className="rounded-xl object-cover shadow-sm"
+          />
+          <div>
+            <p className="text-slate-900 font-black text-lg leading-tight tracking-tight">CVNet</p>
+            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Candidate</p>
           </div>
         </div>
-      </div>
-    </aside>
+
+        {/* Navigation */}
+        <nav className="flex-1 px-3 py-6 overflow-y-auto">
+          <ul className="space-y-2">
+            {navItems.map(({ href, label, icon: Icon }) => {
+              const isActive = pathname === href;
+              return (
+                <li key={href}>
+                  <Link
+                    href={href}
+                    onClick={() => setIsOpen(false)}
+                    className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-bold transition-all ${
+                      isActive
+                        ? "bg-blue-50 text-blue-700"
+                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                    }`}
+                  >
+                    <Icon size={18} />
+                    <span className="flex-1">{label}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+
+        {/* Bottom Section */}
+        <div className="mt-auto border-t border-slate-200 p-4 space-y-2 bg-slate-50/50">
+          
+          <Link
+            href="/settings"
+            onClick={() => setIsOpen(false)}
+            className={`flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-bold transition-all ${
+              pathname === "/settings"
+                ? "bg-slate-100 text-blue-600"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
+          >
+            <Settings size={18} />
+            Settings
+          </Link>
+
+          {/* ✅ LOGOUT BUTTON */}
+          <button type="button"
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-bold text-slate-600 hover:bg-rose-50 hover:text-rose-600 transition-all mb-2"
+          >
+            <LogOut size={18} />
+            Logout
+          </button>
+
+          {/* DYNAMIC USER PROFILE */}
+          <div className="flex items-center gap-3 px-2 py-3 bg-white rounded-2xl border border-slate-200 mt-2 shadow-sm">
+            {profileImageUrl ? (
+              <img 
+                src={profileImageUrl} 
+                alt="Avatar" 
+                className="w-10 h-10 rounded-xl object-cover shadow-inner border border-slate-100"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-sm shadow-inner">
+                {getInitials(dbFullName)}
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="text-slate-900 text-xs font-black truncate leading-tight">{dbFullName}</p>
+              <p className="text-slate-500 text-[10px] font-bold uppercase truncate">Candidate Account</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </>
   );
 }
